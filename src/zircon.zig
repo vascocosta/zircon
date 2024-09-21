@@ -207,12 +207,18 @@ pub const Client = struct {
     alloc: std.mem.Allocator,
     stream: std.net.Stream = undefined,
     buf: std.ArrayList(u8) = undefined,
+    replies: std.ArrayList(Message) = undefined,
+    mutex: std.Thread.Mutex,
+    cond: std.Thread.Condition,
     cfg: Config,
 
     pub fn init(alloc: std.mem.Allocator, cfg: Config) !Client {
         return .{
             .alloc = alloc,
             .buf = try std.ArrayList(u8).initCapacity(alloc, max_msg_len),
+            .replies = std.ArrayList(Message).init(alloc),
+            .mutex = std.Thread.Mutex{},
+            .cond = std.Thread.Condition{},
             .cfg = cfg,
         };
     }
@@ -220,6 +226,7 @@ pub const Client = struct {
     pub fn deinit(self: *Client) void {
         self.disconnect();
         self.buf.deinit();
+        self.replies.deinit();
     }
 
     pub fn connect(self: *Client) !void {
@@ -270,7 +277,7 @@ pub const Client = struct {
         _ = try self.stream.write(msg);
     }
 
-    pub fn loop(self: *Client, msg_callback: fn (Message) ?Message) !void {
+    pub fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
         while (true) {
             const reader = self.stream.reader();
             try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
@@ -310,10 +317,32 @@ pub const Client = struct {
         var proto_message = ProtoMessage.parse(msg) catch return;
         std.debug.print("Command: {}\n", .{proto_message.command});
         const message = proto_message.toMessage() orelse return;
-        const reply = msg_callback(message) orelse return;
-        try self.privmsg(reply.PRIVMSG.targets, reply.PRIVMSG.text);
+
+        _ = try std.Thread.spawn(.{}, msgCallbackWorker, .{ &self.mutex, &self.cond, message, msg_callback, self });
+    }
+
+    pub fn writeLoop(self: *Client) !void {
+        while (true) {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+
+            if (self.replies.items.len > 0) {
+                const reply = self.replies.popOrNull() orelse return;
+                try self.privmsg(reply.PRIVMSG.targets, reply.PRIVMSG.text);
+            } else {
+                self.cond.wait(&self.mutex);
+            }
+        }
     }
 };
+
+fn msgCallbackWorker(mutex: *std.Thread.Mutex, cond: *std.Thread.Condition, message: Message, msg_callback: fn (Message) ?Message, client: *Client) !void {
+    const reply = msg_callback(message) orelse return;
+    mutex.lock();
+    try client.replies.append(reply);
+    mutex.unlock();
+    cond.signal();
+}
 
 test "parse ping message without prefix" {
     const msg = try ProtoMessage.parse("PING :123456789");
