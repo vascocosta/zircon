@@ -277,6 +277,14 @@ pub const Client = struct {
         _ = try self.stream.write(msg);
     }
 
+    fn msgCallbackWorker(self: *Client, message: Message, msg_callback: fn (Message) ?Message) !void {
+        const reply = msg_callback(message) orelse return;
+        self.mutex.lock();
+        try self.replies.append(reply);
+        self.mutex.unlock();
+        self.cond.signal();
+    }
+
     pub fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
         while (true) {
             const reader = self.stream.reader();
@@ -318,7 +326,7 @@ pub const Client = struct {
         std.debug.print("Command: {}\n", .{proto_message.command});
         const message = proto_message.toMessage() orelse return;
 
-        _ = try std.Thread.spawn(.{}, msgCallbackWorker, .{ &self.mutex, &self.cond, message, msg_callback, self });
+        _ = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, message, msg_callback });
     }
 
     pub fn writeLoop(self: *Client) !void {
@@ -335,14 +343,6 @@ pub const Client = struct {
         }
     }
 };
-
-fn msgCallbackWorker(mutex: *std.Thread.Mutex, cond: *std.Thread.Condition, message: Message, msg_callback: fn (Message) ?Message, client: *Client) !void {
-    const reply = msg_callback(message) orelse return;
-    mutex.lock();
-    try client.replies.append(reply);
-    mutex.unlock();
-    cond.signal();
-}
 
 test "parse ping message without prefix" {
     const msg = try ProtoMessage.parse("PING :123456789");
