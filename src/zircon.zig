@@ -285,26 +285,6 @@ pub const Client = struct {
         self.cond.signal();
     }
 
-    pub fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
-        while (true) {
-            const reader = self.stream.reader();
-            try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
-
-            // If there's nothing read from the stream, the connection was closed.
-            if (self.buf.items.len == 0) {
-                std.debug.print("Connection Closed", .{});
-                return;
-            }
-
-            //std.debug.print("{s}\n", .{self.buf.items});
-            try self.handleMessage(self.buf.items[0..self.buf.items.len], msg_callback);
-
-            // Clear the client's buffer at the end of the loop.
-            // This is crucial to avoid corrupted messages.
-            self.buf.clearRetainingCapacity();
-        }
-    }
-
     pub fn handleMessage(self: *Client, msg: []u8, msg_callback: fn (Message) ?Message) !void {
         if (msg.len < 4) {
             return;
@@ -328,6 +308,26 @@ pub const Client = struct {
 
         const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, message, msg_callback });
         thread.detach();
+    }
+
+    pub fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
+        while (true) {
+            const reader = self.stream.reader();
+            try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
+
+            // If there's nothing read from the stream, the connection was closed.
+            if (self.buf.items.len == 0) {
+                std.debug.print("Connection Closed", .{});
+                return;
+            }
+
+            //std.debug.print("{s}\n", .{self.buf.items});
+            try self.handleMessage(self.buf.items[0..self.buf.items.len], msg_callback);
+
+            // Clear the client's buffer at the end of the loop.
+            // This is crucial to avoid corrupted messages.
+            self.buf.clearRetainingCapacity();
+        }
     }
 
     pub fn writeLoop(self: *Client) !void {
