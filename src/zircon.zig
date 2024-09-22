@@ -310,6 +310,12 @@ pub const Client = struct {
         thread.detach();
     }
 
+    pub fn loop(self: *Client, msg_callback: fn (Message) ?Message) !void {
+        const thread = try std.Thread.spawn(.{}, writeLoop, .{self});
+        thread.detach();
+        try self.readLoop(msg_callback);
+    }
+
     pub fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
         while (true) {
             const reader = self.stream.reader();
