@@ -326,7 +326,8 @@ pub const Client = struct {
         std.debug.print("Command: {}\n", .{proto_message.command});
         const message = proto_message.toMessage() orelse return;
 
-        _ = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, message, msg_callback });
+        const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, message, msg_callback });
+        thread.detach();
     }
 
     pub fn writeLoop(self: *Client) !void {
