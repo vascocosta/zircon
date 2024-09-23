@@ -244,7 +244,7 @@ pub const Client = struct {
         std.debug.print("Disconnected\n", .{});
     }
 
-    pub fn pong(self: *Client, id: []const u8) !void {
+    fn pong(self: *Client, id: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PONG :{s}{s}", .{ id, delimiter });
         defer self.alloc.free(raw_msg);
 
@@ -264,14 +264,14 @@ pub const Client = struct {
         _ = try self.stream.write(raw_msg);
     }
 
-    pub fn join(self: *Client, channel: []const u8) !void {
+    fn join(self: *Client, channel: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "JOIN {s}{s}", .{ channel, delimiter });
         defer self.alloc.free(raw_msg);
 
         _ = try self.stream.write(raw_msg);
     }
 
-    pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
+    fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s} {s}", .{ target, text, delimiter });
         defer self.alloc.free(raw_msg);
 
@@ -286,7 +286,7 @@ pub const Client = struct {
         self.cond.signal();
     }
 
-    pub fn handleMessage(self: *Client, raw_msg: []u8, msg_callback: fn (Message) ?Message) !void {
+    fn handleMessage(self: *Client, raw_msg: []u8, msg_callback: fn (Message) ?Message) !void {
         if (raw_msg.len < 4) {
             return;
         }
@@ -322,7 +322,7 @@ pub const Client = struct {
         try self.readLoop(msg_callback);
     }
 
-    pub fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
+    fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
         while (true) {
             const reader = self.stream.reader();
             try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
@@ -342,7 +342,7 @@ pub const Client = struct {
         }
     }
 
-    pub fn writeLoop(self: *Client) !void {
+    fn writeLoop(self: *Client) !void {
         while (true) {
             self.mutex.lock();
             defer self.mutex.unlock();
