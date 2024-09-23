@@ -306,10 +306,12 @@ pub const Client = struct {
             }
         }
 
+        // Otherwise parse msg into a ProtoMessage and Message.
+        // Spawn a thread to handle message using msg_callback.
+        // Detach the thread so that it takes care of cleanup.
         var proto_message = ProtoMessage.parse(msg) catch return;
         std.debug.print("Command: {}\n", .{proto_message.command});
         const message = proto_message.toMessage() orelse return;
-
         const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, message, msg_callback });
         thread.detach();
     }
