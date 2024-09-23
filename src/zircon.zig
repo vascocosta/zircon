@@ -133,15 +133,15 @@ pub const ProtoMessage = struct {
     command: Command,
     params: ParamIterator,
 
-    pub fn parse(raw_message: []const u8) !ProtoMessage {
+    pub fn parse(raw_msg: []const u8) !ProtoMessage {
         // If the message is shorter than a numeric code, bail out soon.
-        if (raw_message.len < 3) {
+        if (raw_msg.len < 3) {
             return MessageError.ParseError;
         }
 
         // Parse message prefix.
         var prefix: ?[]const u8 = null;
-        var rest: []const u8 = std.mem.trim(u8, raw_message, &std.ascii.whitespace);
+        var rest: []const u8 = std.mem.trim(u8, raw_msg, &std.ascii.whitespace);
         if (rest[0] == ':') {
             var iter = std.mem.tokenizeAny(u8, rest[1..], &std.ascii.whitespace);
             prefix = iter.next();
@@ -245,74 +245,74 @@ pub const Client = struct {
     }
 
     pub fn pong(self: *Client, id: []const u8) !void {
-        const msg = try std.fmt.allocPrint(self.alloc, "PONG :{s}{s}", .{ id, delimiter });
-        defer self.alloc.free(msg);
+        const raw_msg = try std.fmt.allocPrint(self.alloc, "PONG :{s}{s}", .{ id, delimiter });
+        defer self.alloc.free(raw_msg);
 
-        _ = try self.stream.write(msg);
+        _ = try self.stream.write(raw_msg);
     }
 
     pub fn register(self: *Client) !void {
-        const msg = try std.fmt.allocPrint(self.alloc, "NICK {s}{s}USER {s} * * :{s}{s}", .{
+        const raw_msg = try std.fmt.allocPrint(self.alloc, "NICK {s}{s}USER {s} * * :{s}{s}", .{
             self.cfg.nick,
             delimiter,
             self.cfg.user,
             self.cfg.real_name,
             delimiter,
         });
-        defer self.alloc.free(msg);
+        defer self.alloc.free(raw_msg);
 
-        _ = try self.stream.write(msg);
+        _ = try self.stream.write(raw_msg);
     }
 
     pub fn join(self: *Client, channel: []const u8) !void {
-        const msg = try std.fmt.allocPrint(self.alloc, "JOIN {s}{s}", .{ channel, delimiter });
-        defer self.alloc.free(msg);
+        const raw_msg = try std.fmt.allocPrint(self.alloc, "JOIN {s}{s}", .{ channel, delimiter });
+        defer self.alloc.free(raw_msg);
 
-        _ = try self.stream.write(msg);
+        _ = try self.stream.write(raw_msg);
     }
 
     pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
-        const msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s} {s}", .{ target, text, delimiter });
-        defer self.alloc.free(msg);
+        const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s} {s}", .{ target, text, delimiter });
+        defer self.alloc.free(raw_msg);
 
-        _ = try self.stream.write(msg);
+        _ = try self.stream.write(raw_msg);
     }
 
-    fn msgCallbackWorker(self: *Client, message: Message, msg_callback: fn (Message) ?Message) !void {
-        const reply = msg_callback(message) orelse return;
+    fn msgCallbackWorker(self: *Client, msg: Message, msg_callback: fn (Message) ?Message) !void {
+        const reply = msg_callback(msg) orelse return;
         self.mutex.lock();
         try self.replies.append(reply);
         self.mutex.unlock();
         self.cond.signal();
     }
 
-    pub fn handleMessage(self: *Client, msg: []u8, msg_callback: fn (Message) ?Message) !void {
-        if (msg.len < 4) {
+    pub fn handleMessage(self: *Client, raw_msg: []u8, msg_callback: fn (Message) ?Message) !void {
+        if (raw_msg.len < 4) {
             return;
         }
 
         // Handle the PING messages ourselves.
-        if (std.mem.eql(u8, msg[0..4], "PING")) {
-            const index = std.mem.indexOf(u8, msg, ":").?;
-            const id = msg[index + 1 ..];
+        if (std.mem.eql(u8, raw_msg[0..4], "PING")) {
+            const index = std.mem.indexOf(u8, raw_msg, ":").?;
+            const id = raw_msg[index + 1 ..];
             try self.pong(id);
             return;
         }
 
         // Auto-join the configured channels.
-        if (std.mem.indexOf(u8, msg, " 376 ")) |_| {
+        if (std.mem.indexOf(u8, raw_msg, " 376 ")) |_| {
             for (self.cfg.channels) |channel| {
                 try self.join(channel);
             }
         }
 
-        // Otherwise parse msg into a ProtoMessage and Message.
-        // Spawn a thread to handle message using msg_callback.
-        // Detach the thread so that it takes care of cleanup.
-        var proto_message = ProtoMessage.parse(msg) catch return;
-        std.debug.print("Command: {}\n", .{proto_message.command});
-        const message = proto_message.toMessage() orelse return;
-        const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, message, msg_callback });
+        // Otherwise parse the raw_msg into a ProtoMessage and Message.
+        // Spawn a thread to handle the message using msg_callback.
+        // Detach the thread so that it takes care of cleanup itself.
+        var proto_msg = ProtoMessage.parse(raw_msg) catch return;
+        std.debug.print("Command: {}\n", .{proto_msg.command});
+        const msg = proto_msg.toMessage() orelse return;
+        const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, msg_callback });
         thread.detach();
     }
 
