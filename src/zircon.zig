@@ -205,9 +205,9 @@ pub const Client = struct {
     };
 
     alloc: std.mem.Allocator,
-    stream: std.net.Stream = undefined,
-    buf: std.ArrayList(u8) = undefined,
-    replies: std.ArrayList(Message) = undefined,
+    stream: std.net.Stream,
+    buf: std.ArrayList(u8),
+    replies: std.ArrayList(Message),
     mutex: std.Thread.Mutex,
     cond: std.Thread.Condition,
     cfg: Config,
@@ -215,6 +215,7 @@ pub const Client = struct {
     pub fn init(alloc: std.mem.Allocator, cfg: Config) !Client {
         return .{
             .alloc = alloc,
+            .stream = undefined,
             .buf = try std.ArrayList(u8).initCapacity(alloc, max_msg_len),
             .replies = std.ArrayList(Message).init(alloc),
             .mutex = std.Thread.Mutex{},
