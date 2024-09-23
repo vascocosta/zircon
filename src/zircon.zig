@@ -291,12 +291,14 @@ pub const Client = struct {
             return;
         }
 
+        // Handle the PING messages ourselves.
         if (std.mem.eql(u8, msg[0..4], "PING")) {
             const index = std.mem.indexOf(u8, msg, ":").?;
             const id = msg[index + 1 ..];
             try self.pong(id);
         }
 
+        // Auto-join the configured channels.
         if (std.mem.indexOf(u8, msg, " 376 ")) |_| {
             for (self.cfg.channels) |channel| {
                 try self.join(channel);
