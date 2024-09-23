@@ -296,6 +296,7 @@ pub const Client = struct {
             const index = std.mem.indexOf(u8, msg, ":").?;
             const id = msg[index + 1 ..];
             try self.pong(id);
+            return;
         }
 
         // Auto-join the configured channels.
