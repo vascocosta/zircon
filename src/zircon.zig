@@ -1,4 +1,6 @@
 const std = @import("std");
+const tls = @import("tls");
+
 const expect = std.testing.expect;
 
 const default_port = 6667;
@@ -201,11 +203,13 @@ pub const Client = struct {
         real_name: []const u8,
         server: []const u8,
         port: ?u16,
+        tls: bool = false,
         channels: [][]const u8,
     };
 
     alloc: std.mem.Allocator,
     stream: std.net.Stream,
+    connection: tls.Connection(std.net.Stream),
     buf: std.ArrayList(u8),
     replies: std.ArrayList(Message),
     mutex: std.Thread.Mutex,
@@ -216,6 +220,7 @@ pub const Client = struct {
         return .{
             .alloc = alloc,
             .stream = undefined,
+            .connection = undefined,
             .buf = try std.ArrayList(u8).initCapacity(alloc, max_msg_len),
             .replies = std.ArrayList(Message).init(alloc),
             .mutex = std.Thread.Mutex{},
@@ -236,10 +241,23 @@ pub const Client = struct {
             self.cfg.server,
             self.cfg.port orelse default_port,
         );
+        if (self.cfg.tls) {
+            const root_ca = try tls.CertBundle.fromSystem(self.alloc);
+            self.connection = try tls.client(self.stream, .{
+                .host = self.cfg.server,
+                .root_ca = root_ca,
+            });
+        }
         std.debug.print("Connected\n", .{});
     }
 
     pub fn disconnect(self: *Client) void {
+        if (self.cfg.tls) {
+            self.connection.close() catch |err| {
+                std.debug.print("Could not close connection: {}", .{err});
+                return;
+            };
+        }
         self.stream.close();
         std.debug.print("Disconnected\n", .{});
     }
@@ -248,7 +266,10 @@ pub const Client = struct {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PONG :{s}{s}", .{ id, delimiter });
         defer self.alloc.free(raw_msg);
 
-        _ = try self.stream.write(raw_msg);
+        _ = switch (self.cfg.tls) {
+            true => try self.connection.write(raw_msg),
+            false => try self.stream.write(raw_msg),
+        };
     }
 
     pub fn register(self: *Client) !void {
@@ -261,21 +282,30 @@ pub const Client = struct {
         });
         defer self.alloc.free(raw_msg);
 
-        _ = try self.stream.write(raw_msg);
+        _ = switch (self.cfg.tls) {
+            true => try self.connection.write(raw_msg),
+            false => try self.stream.write(raw_msg),
+        };
     }
 
     fn join(self: *Client, channel: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "JOIN {s}{s}", .{ channel, delimiter });
         defer self.alloc.free(raw_msg);
 
-        _ = try self.stream.write(raw_msg);
+        _ = switch (self.cfg.tls) {
+            true => try self.connection.write(raw_msg),
+            false => try self.stream.write(raw_msg),
+        };
     }
 
     fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s} {s}", .{ target, text, delimiter });
         defer self.alloc.free(raw_msg);
 
-        _ = try self.stream.write(raw_msg);
+        _ = switch (self.cfg.tls) {
+            true => try self.connection.write(raw_msg),
+            false => try self.stream.write(raw_msg),
+        };
     }
 
     fn msgCallbackWorker(self: *Client, msg: Message, msg_callback: fn (Message) ?Message) !void {
@@ -324,8 +354,16 @@ pub const Client = struct {
 
     fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
         while (true) {
-            const reader = self.stream.reader();
-            try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
+            switch (self.cfg.tls) {
+                true => {
+                    const reader = self.connection.reader();
+                    try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
+                },
+                false => {
+                    const reader = self.stream.reader();
+                    try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
+                },
+            }
 
             // If there's nothing read from the stream, the connection was closed.
             if (self.buf.items.len == 0) {
