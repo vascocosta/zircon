@@ -3,8 +3,8 @@
     .version = "0.0.0",
     .dependencies = .{
         .tls = .{
-            .url = "git+https://github.com/ianic/tls.zig#1775eb4d27d7f2058ab569324a163f43496b0626",
-            .hash = "1220155274b6ddc0fcdf361e279efb66d60cb989eb71d4a01e963a061c96bb6995c9",
+            .url = "git+https://github.com/ianic/tls.zig?ref=HEAD#1b0228642771ba3efddb92279294e734776191e9",
+            .hash = "tls-0.1.0-ER2e0sAOBQDN5xgdTgG-pze9C6_MwSr-xxHDxQMxQFn-",
         },
     },
     .paths = .{

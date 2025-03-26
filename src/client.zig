@@ -56,7 +56,7 @@ pub const Client = struct {
             self.cfg.port orelse default_port,
         );
         if (self.cfg.tls) {
-            const root_ca = try tls.CertBundle.fromSystem(self.alloc);
+            const root_ca = try tls.config.CertBundle.fromSystem(self.alloc);
             self.connection = try tls.client(self.stream, .{
                 .host = self.cfg.server,
                 .root_ca = root_ca,
@@ -200,7 +200,7 @@ pub const Client = struct {
             defer self.mutex.unlock();
 
             if (self.replies.items.len > 0) {
-                const reply = self.replies.popOrNull() orelse return;
+                const reply = self.replies.pop() orelse return;
                 try self.privmsg(reply.PRIVMSG.targets, reply.PRIVMSG.text);
             } else {
                 self.cond.wait(&self.mutex);
