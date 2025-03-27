@@ -3,6 +3,7 @@ const tls = @import("tls");
 
 const expect = std.testing.expect;
 
+const utils = @import("utils.zig");
 pub const Message = @import("message.zig").Message;
 pub const ProtoMessage = @import("message.zig").ProtoMessage;
 
@@ -62,18 +63,18 @@ pub const Client = struct {
                 .root_ca = root_ca,
             });
         }
-        std.debug.print("Connected\n", .{});
+        utils.debug("Connected\n", .{});
     }
 
     pub fn disconnect(self: *Client) void {
         if (self.cfg.tls) {
             self.connection.close() catch |err| {
-                std.debug.print("Could not close connection: {}", .{err});
+                utils.debug("Could not close connection: {}", .{err});
                 return;
             };
         }
         self.stream.close();
-        std.debug.print("Disconnected\n", .{});
+        utils.debug("Disconnected\n", .{});
     }
 
     fn pong(self: *Client, id: []const u8) !void {
@@ -154,7 +155,7 @@ pub const Client = struct {
         // Spawn a thread to handle the message using msg_callback.
         // Detach the thread so that it takes care of cleanup itself.
         var proto_msg = ProtoMessage.parse(raw_msg) catch return;
-        std.debug.print("Command: {}\n", .{proto_msg.command});
+        utils.debug("Command: {}\n", .{proto_msg.command});
         const msg = proto_msg.toMessage() orelse return;
         if (msg_callback) |callback| {
             if (background) {
@@ -187,11 +188,11 @@ pub const Client = struct {
 
             // If there's nothing read from the stream, the connection was closed.
             if (self.buf.items.len == 0) {
-                std.debug.print("Connection Closed", .{});
+                utils.debug("Connection Closed", .{});
                 return;
             }
 
-            //std.debug.print("{s}\n", .{self.buf.items});
+            //utils.debug("{s}\n", .{self.buf.items});
             try self.handleMessage(self.buf.items[0..self.buf.items.len], msg_callback, background);
 
             // Clear the client's buffer at the end of the loop.
@@ -216,7 +217,7 @@ pub const Client = struct {
                         try self.join(args.channels);
                     },
                     else => {
-                        std.debug.print("Unsupported message type.\n", .{});
+                        utils.debug("Unsupported message type.\n", .{});
                     },
                 }
             } else {
