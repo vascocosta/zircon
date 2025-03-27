@@ -130,7 +130,7 @@ pub const Client = struct {
         self.cond.signal();
     }
 
-    fn handleMessage(self: *Client, raw_msg: []u8, msg_callback: fn (Message) ?Message) !void {
+    fn handleMessage(self: *Client, raw_msg: []u8, msg_callback: ?fn (Message) ?Message) !void {
         if (raw_msg.len < 4) {
             return;
         }
@@ -156,17 +156,19 @@ pub const Client = struct {
         var proto_msg = ProtoMessage.parse(raw_msg) catch return;
         std.debug.print("Command: {}\n", .{proto_msg.command});
         const msg = proto_msg.toMessage() orelse return;
-        const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, msg_callback });
-        thread.detach();
+        if (msg_callback) |callback| {
+            const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, callback });
+            thread.detach();
+        }
     }
 
-    pub fn loop(self: *Client, msg_callback: fn (Message) ?Message) !void {
+    pub fn loop(self: *Client, msg_callback: ?fn (Message) ?Message) !void {
         const thread = try std.Thread.spawn(.{}, writeLoop, .{self});
         thread.detach();
         try self.readLoop(msg_callback);
     }
 
-    fn readLoop(self: *Client, msg_callback: fn (Message) ?Message) !void {
+    fn readLoop(self: *Client, msg_callback: ?fn (Message) ?Message) !void {
         while (true) {
             switch (self.cfg.tls) {
                 true => {
