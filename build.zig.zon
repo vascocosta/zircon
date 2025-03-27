@@ -5,7 +5,7 @@
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .tls = .{
-            .url = "git+https://github.com/ianic/tls.zig?ref=HEAD#1b0228642771ba3efddb92279294e734776191e9",
+            .url = "https://github.com/ianic/tls.zig/archive/1b0228642771ba3efddb92279294e734776191e9.tar.gz",
             .hash = "tls-0.1.0-ER2e0sAOBQDN5xgdTgG-pze9C6_MwSr-xxHDxQMxQFn-",
         },
     },
