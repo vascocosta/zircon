@@ -130,7 +130,7 @@ pub const Client = struct {
         self.cond.signal();
     }
 
-    fn handleMessage(self: *Client, raw_msg: []u8, msg_callback: ?fn (Message) ?Message) !void {
+    fn handleMessage(self: *Client, raw_msg: []u8, msg_callback: ?fn (Message) ?Message, background: bool) !void {
         if (raw_msg.len < 4) {
             return;
         }
@@ -157,18 +157,22 @@ pub const Client = struct {
         std.debug.print("Command: {}\n", .{proto_msg.command});
         const msg = proto_msg.toMessage() orelse return;
         if (msg_callback) |callback| {
-            const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, callback });
-            thread.detach();
+            if (background) {
+                const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, callback });
+                thread.detach();
+            } else {
+                try self.msgCallbackWorker(msg, callback);
+            }
         }
     }
 
-    pub fn loop(self: *Client, msg_callback: ?fn (Message) ?Message) !void {
+    pub fn loop(self: *Client, msg_callback: ?fn (Message) ?Message, background: bool) !void {
         const thread = try std.Thread.spawn(.{}, writeLoop, .{self});
         thread.detach();
-        try self.readLoop(msg_callback);
+        try self.readLoop(msg_callback, background);
     }
 
-    fn readLoop(self: *Client, msg_callback: ?fn (Message) ?Message) !void {
+    fn readLoop(self: *Client, msg_callback: ?fn (Message) ?Message, background: bool) !void {
         while (true) {
             switch (self.cfg.tls) {
                 true => {
@@ -188,7 +192,7 @@ pub const Client = struct {
             }
 
             //std.debug.print("{s}\n", .{self.buf.items});
-            try self.handleMessage(self.buf.items[0..self.buf.items.len], msg_callback);
+            try self.handleMessage(self.buf.items[0..self.buf.items.len], msg_callback, background);
 
             // Clear the client's buffer at the end of the loop.
             // This is crucial to avoid corrupted messages.
