@@ -102,7 +102,7 @@ pub const Client = struct {
         };
     }
 
-    fn join(self: *Client, channel: []const u8) !void {
+    pub fn join(self: *Client, channel: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "JOIN {s}{s}", .{ channel, delimiter });
         defer self.alloc.free(raw_msg);
 
@@ -112,7 +112,7 @@ pub const Client = struct {
         };
     }
 
-    fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
+    pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s} {s}", .{ target, text, delimiter });
         defer self.alloc.free(raw_msg);
 
@@ -201,7 +201,18 @@ pub const Client = struct {
 
             if (self.replies.items.len > 0) {
                 const reply = self.replies.pop() orelse return;
-                try self.privmsg(reply.PRIVMSG.targets, reply.PRIVMSG.text);
+
+                switch (reply) {
+                    .PRIVMSG => |args| {
+                        try self.privmsg(args.targets, args.text);
+                    },
+                    .JOIN => |args| {
+                        try self.join(args.channels);
+                    },
+                    else => {
+                        std.debug.print("Unsupported message type.\n", .{});
+                    },
+                }
             } else {
                 self.cond.wait(&self.mutex);
             }
