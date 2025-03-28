@@ -192,7 +192,6 @@ pub const Client = struct {
                 return;
             }
 
-            //utils.debug("{s}\n", .{self.buf.items});
             try self.handleMessage(self.buf.items[0..self.buf.items.len], msg_callback, background);
 
             // Clear the client's buffer at the end of the loop.
