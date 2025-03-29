@@ -22,6 +22,15 @@ pub const Client = struct {
         channels: [][]const u8,
     };
 
+    const LoopConfig = struct {
+        fn defaultSpawnThread(_: Message) bool {
+            return false;
+        }
+
+        msg_callback: ?fn (Message) ?Message = null,
+        spawn_thread: fn (Message) bool = defaultSpawnThread,
+    };
+
     alloc: std.mem.Allocator,
     stream: std.net.Stream,
     connection: tls.Connection(std.net.Stream),
@@ -69,7 +78,7 @@ pub const Client = struct {
     pub fn disconnect(self: *Client) void {
         if (self.cfg.tls) {
             self.connection.close() catch |err| {
-                utils.debug("Could not close connection: {}", .{err});
+                utils.debug("Could not close connection: {}\n", .{err});
                 return;
             };
         }
@@ -131,7 +140,11 @@ pub const Client = struct {
         self.cond.signal();
     }
 
-    fn handleMessage(self: *Client, raw_msg: []u8, msg_callback: ?fn (Message) ?Message, spawn: bool) !void {
+    fn handleMessage(
+        self: *Client,
+        raw_msg: []u8,
+        loop_config: LoopConfig,
+    ) !void {
         if (raw_msg.len < 4) {
             return;
         }
@@ -157,24 +170,24 @@ pub const Client = struct {
         var proto_msg = ProtoMessage.parse(raw_msg) catch return;
         utils.debug("Command: {}\n", .{proto_msg.command});
         const msg = proto_msg.toMessage() orelse return;
-        if (msg_callback) |callback| {
-            if (spawn) {
-                const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, callback });
-                utils.debug("New thread created.", .{});
+        if (loop_config.msg_callback) |msg_callback| {
+            if (loop_config.spawn_thread(msg)) {
+                const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, msg_callback });
+                utils.debug("Started message callback worker thread\n", .{});
                 thread.detach();
             } else {
-                try self.msgCallbackWorker(msg, callback);
+                try self.msgCallbackWorker(msg, msg_callback);
             }
         }
     }
 
-    pub fn loop(self: *Client, msg_callback: ?fn (Message) ?Message, spawn: bool) !void {
+    pub fn loop(self: *Client, loop_config: LoopConfig) !void {
         const thread = try std.Thread.spawn(.{}, writeLoop, .{self});
         thread.detach();
-        try self.readLoop(msg_callback, spawn);
+        try self.readLoop(loop_config);
     }
 
-    fn readLoop(self: *Client, msg_callback: ?fn (Message) ?Message, spawn: bool) !void {
+    fn readLoop(self: *Client, loop_config: LoopConfig) !void {
         while (true) {
             switch (self.cfg.tls) {
                 true => {
@@ -189,11 +202,11 @@ pub const Client = struct {
 
             // If there's nothing read from the stream, the connection was closed.
             if (self.buf.items.len == 0) {
-                utils.debug("Connection Closed", .{});
+                utils.debug("Connection Closed\n", .{});
                 return;
             }
 
-            try self.handleMessage(self.buf.items[0..self.buf.items.len], msg_callback, spawn);
+            try self.handleMessage(self.buf.items[0..self.buf.items.len], loop_config);
 
             // Clear the client's buffer at the end of the loop.
             // This is crucial to avoid corrupted messages.
@@ -217,7 +230,7 @@ pub const Client = struct {
                         try self.join(args.channels);
                     },
                     else => {
-                        utils.debug("Unsupported message type.\n", .{});
+                        utils.debug("Unsupported message type\n", .{});
                     },
                 }
             } else {
