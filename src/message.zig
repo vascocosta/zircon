@@ -3,7 +3,6 @@ const std = @import("std");
 pub const Message = union(enum) {
     JOIN: struct {
         channels: []const u8,
-        keys: []const u8,
     },
     NICK: struct {
         nick: []const u8,
@@ -97,17 +96,29 @@ pub const ProtoMessage = struct {
         index: usize = 0,
 
         pub fn next(self: *ParamIterator) ?[]const u8 {
-            if (self.params == null) return null;
-
+            const params = self.params orelse return null;
             const start = self.index;
-            while (self.index < self.params.?.len) {
-                if (self.params.?[start] == ':') {
-                    self.index = self.params.?.len;
-                    return self.params.?[start + 1 ..];
+
+            while (self.index <= params.len) {
+                if (self.index == params.len) {
+                    const item = params[start..self.index];
+
+                    self.index += 1;
+
+                    if (item.len == 0) {
+                        break;
+                    } else {
+                        return item;
+                    }
+                }
+
+                if (params[start] == ':') {
+                    self.index = params.len;
+                    return params[start + 1 ..];
                 } else {
-                    if (self.params.?[self.index] == ' ' or self.index == self.params.?.len) {
+                    if (params[self.index] == ' ' or self.index == params.len) {
                         self.index += 1;
-                        return self.params.?[start .. self.index - 1];
+                        return params[start .. self.index - 1];
                     }
                     self.index += 1;
                 }
@@ -163,7 +174,6 @@ pub const ProtoMessage = struct {
             .JOIN => return Message{
                 .JOIN = .{
                     .channels = self.params.next() orelse "",
-                    .keys = self.params.next() orelse "",
                 },
             },
             .NICK => return Message{
