@@ -1,8 +1,12 @@
 # zircon
 
-A simple IRC lib written in Zig.
+A simple IRC library written in Zig.
 
-The zircon lib is easy to use, allowing the creation of either IRC clients or bots. One of its core concepts is the use of threads for better performance. However this is done in a simple way, with a dedicated thread to write messages to the server and using the main thread to read messages from the server.
+The `zircon` library is easy to use, allowing the creation of either general IRC clients or bots. One of its core concepts is the use of threads for better performance. However this is done behind the scenes in a simple way, with a dedicated thread to write messages to the server, using the main thread to read messages from the server in the main client loop (`zircon.Client.loop`) and providing a callback mechanism to the user code.
+
+By design, the user of the library does not have to create any threads at all. Like mentioned above, the main client loop runs on the main thread and that loop calls the callback function pointed to by `msg_callback`. One simple way to use this library is to simply define this callback in the user code to customise how to reply to incoming IRC messages with your own IRC messages making use of `zircon.Message`. By default this callback you define also runs on the main thread, but you can use the `spawn_thread` callback to override this quite easily, by returning true to automatically enable a worker thread depending on the kind of message received. This is especially useful for creating long running commands in a background thread, without the need to spawn it yourself.
+
+Make sure you read the examples section below to understand in more detail how this works...
 
 # Features
 
