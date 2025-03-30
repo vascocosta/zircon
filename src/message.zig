@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const expect = std.testing.expect;
+
 pub const Message = union(enum) {
     JOIN: struct {
         channels: []const u8,
@@ -198,3 +200,41 @@ pub const ProtoMessage = struct {
         }
     }
 };
+
+test "parse ping message without prefix" {
+    const msg = try ProtoMessage.parse("PING :123456789");
+    var params = msg.params;
+    try expect(msg.prefix == null);
+    try expect(msg.command == .PING);
+    try expect(std.mem.eql(u8, params.next().?, "123456789"));
+    try expect(params.next() == null);
+}
+
+test "parse ping message with prefix" {
+    const msg = try ProtoMessage.parse(":nick!user@host PING :123456789");
+    var params = msg.params;
+    try expect(std.mem.eql(u8, msg.prefix.?, "nick!user@host"));
+    try expect(msg.command == .PING);
+    try expect(std.mem.eql(u8, params.next().?, "123456789"));
+    try expect(params.next() == null);
+}
+
+test "parse privmsg without prefix" {
+    const msg = try ProtoMessage.parse("PRIVMSG #channel :hello world!");
+    var params = msg.params;
+    try expect(msg.prefix == null);
+    try expect(msg.command == .PRIVMSG);
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "hello world!"));
+    try expect(params.next() == null);
+}
+
+test "parse privmsg with prefix" {
+    const msg = try ProtoMessage.parse(":nick!user@host PRIVMSG #channel :hello world!");
+    var params = msg.params;
+    try expect(std.mem.eql(u8, msg.prefix.?, "nick!user@host"));
+    try expect(msg.command == .PRIVMSG);
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "hello world!"));
+    try expect(params.next() == null);
+}
