@@ -16,7 +16,7 @@ pub const Message = union(enum) {
     },
     PART: struct {
         channels: []const u8,
-        text: []const u8,
+        reason: []const u8,
     },
     NOMSG: void,
 };
@@ -193,7 +193,7 @@ pub const ProtoMessage = struct {
             .PART => return Message{
                 .PART = .{
                     .channels = self.params.next() orelse "",
-                    .text = self.params.next() orelse "",
+                    .reason = self.params.next() orelse "",
                 },
             },
             else => return null,
@@ -236,5 +236,25 @@ test "parse privmsg with prefix" {
     try expect(msg.command == .PRIVMSG);
     try expect(std.mem.eql(u8, params.next().?, "#channel"));
     try expect(std.mem.eql(u8, params.next().?, "hello world!"));
+    try expect(params.next() == null);
+}
+
+test "parse part message without prefix" {
+    const msg = try ProtoMessage.parse("PART #channel :goodbye!");
+    var params = msg.params;
+    try expect(msg.prefix == null);
+    try expect(msg.command == .PART);
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "goodbye!"));
+    try expect(params.next() == null);
+}
+
+test "parse part message with prefix" {
+    const msg = try ProtoMessage.parse(":nick!user@host PART #channel :goodbye!");
+    var params = msg.params;
+    try expect(std.mem.eql(u8, msg.prefix.?, "nick!user@host"));
+    try expect(msg.command == .PART);
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "goodbye!"));
     try expect(params.next() == null);
 }

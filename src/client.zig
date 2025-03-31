@@ -120,6 +120,16 @@ pub const Client = struct {
         };
     }
 
+    pub fn part(self: *Client, channels: []const u8, reason: ?[]const u8) !void {
+        const raw_msg = try std.fmt.allocPrint(self.alloc, "PART {s} :{s}{s}", .{ channels, reason orelse "", delimiter });
+        defer self.alloc.free(raw_msg);
+
+        _ = switch (self.cfg.tls) {
+            true => try self.connection.write(raw_msg),
+            false => try self.stream.write(raw_msg),
+        };
+    }
+
     pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s} {s}", .{ target, text, delimiter });
         defer self.alloc.free(raw_msg);
@@ -146,6 +156,8 @@ pub const Client = struct {
         if (raw_msg.len < 4) {
             return;
         }
+
+        utils.debug("{s}", .{raw_msg});
 
         // Handle the PING messages ourselves.
         if (std.mem.eql(u8, raw_msg[0..4], "PING")) {
@@ -226,6 +238,9 @@ pub const Client = struct {
                     },
                     .JOIN => |args| {
                         try self.join(args.channels);
+                    },
+                    .PART => |args| {
+                        try self.part(args.channels, args.reason);
                     },
                     else => {
                         utils.debug("Unsupported message type\n", .{});
