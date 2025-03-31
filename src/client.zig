@@ -131,7 +131,7 @@ pub const Client = struct {
     }
 
     pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
-        const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s} {s}", .{ target, text, delimiter });
+        const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s}{s}", .{ target, text, delimiter });
         defer self.alloc.free(raw_msg);
 
         _ = switch (self.cfg.tls) {
