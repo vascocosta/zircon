@@ -157,8 +157,6 @@ pub const Client = struct {
             return;
         }
 
-        utils.debug("{s}", .{raw_msg});
-
         // Handle the PING messages ourselves.
         if (std.mem.eql(u8, raw_msg[0..4], "PING")) {
             const index = std.mem.indexOf(u8, raw_msg, ":").?;
