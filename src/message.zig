@@ -142,14 +142,15 @@ pub const ProtoMessage = struct {
     params: ParamIterator,
 
     pub fn parse(raw_msg: []const u8) !ProtoMessage {
+        var rest: []const u8 = std.mem.trim(u8, raw_msg, &std.ascii.whitespace);
+
         // If the message is shorter than a numeric code, bail out soon.
-        if (raw_msg.len < 3) {
+        if (rest.len < 3) {
             return MessageError.ParseError;
         }
 
         // Parse message prefix.
         var prefix: ?[]const u8 = null;
-        var rest: []const u8 = std.mem.trim(u8, raw_msg, &std.ascii.whitespace);
         if (rest[0] == ':') {
             var iter = std.mem.tokenizeAny(u8, rest[1..], &std.ascii.whitespace);
             prefix = iter.next();
