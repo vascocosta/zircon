@@ -88,10 +88,7 @@ pub const Client = struct {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PONG :{s}{s}", .{ id, delimiter });
         defer self.alloc.free(raw_msg);
 
-        _ = switch (self.cfg.tls) {
-            true => try self.connection.write(raw_msg),
-            false => try self.stream.write(raw_msg),
-        };
+        try self.send(raw_msg);
     }
 
     pub fn register(self: *Client) !void {
@@ -104,10 +101,7 @@ pub const Client = struct {
         });
         defer self.alloc.free(raw_msg);
 
-        _ = switch (self.cfg.tls) {
-            true => try self.connection.write(raw_msg),
-            false => try self.stream.write(raw_msg),
-        };
+        try self.send(raw_msg);
     }
 
     pub fn nick(self: *Client, nickname: []const u8, hopcount: ?u8) !void {
@@ -118,36 +112,31 @@ pub const Client = struct {
         };
         defer self.alloc.free(raw_msg);
 
-        _ = switch (self.cfg.tls) {
-            true => try self.connection.write(raw_msg),
-            false => try self.stream.write(raw_msg),
-        };
+        try self.send(raw_msg);
     }
 
     pub fn join(self: *Client, channel: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "JOIN {s}{s}", .{ channel, delimiter });
         defer self.alloc.free(raw_msg);
 
-        _ = switch (self.cfg.tls) {
-            true => try self.connection.write(raw_msg),
-            false => try self.stream.write(raw_msg),
-        };
+        try self.send(raw_msg);
     }
 
     pub fn part(self: *Client, channels: []const u8, reason: ?[]const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PART {s} :{s}{s}", .{ channels, reason orelse "", delimiter });
         defer self.alloc.free(raw_msg);
 
-        _ = switch (self.cfg.tls) {
-            true => try self.connection.write(raw_msg),
-            false => try self.stream.write(raw_msg),
-        };
+        try self.send(raw_msg);
     }
 
     pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s}{s}", .{ target, text, delimiter });
         defer self.alloc.free(raw_msg);
 
+        try self.send(raw_msg);
+    }
+
+    fn send(self: *Client, raw_msg: []const u8) !void {
         _ = switch (self.cfg.tls) {
             true => try self.connection.write(raw_msg),
             false => try self.stream.write(raw_msg),
