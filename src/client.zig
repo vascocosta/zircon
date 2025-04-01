@@ -85,58 +85,43 @@ pub const Client = struct {
     }
 
     fn pong(self: *Client, id: []const u8) !void {
-        const raw_msg = try std.fmt.allocPrint(self.alloc, "PONG :{s}{s}", .{ id, delimiter });
-        defer self.alloc.free(raw_msg);
-
-        try self.send(raw_msg);
+        try self.sendCommand("PONG :{s}{s}", .{ id, delimiter });
     }
 
     pub fn register(self: *Client) !void {
-        const raw_msg = try std.fmt.allocPrint(self.alloc, "NICK {s}{s}USER {s} * * :{s}{s}", .{
+        try self.sendCommand("NICK {s}{s}USER {s} * * :{s}{s}", .{
             self.cfg.nick,
             delimiter,
             self.cfg.user,
             self.cfg.real_name,
             delimiter,
         });
-        defer self.alloc.free(raw_msg);
-
-        try self.send(raw_msg);
     }
 
     pub fn nick(self: *Client, nickname: []const u8, hopcount: ?u8) !void {
-        const raw_msg = if (hopcount) |hopcount_val| blk: {
-            break :blk try std.fmt.allocPrint(self.alloc, "NICK {s} {d}{s}", .{ nickname, hopcount_val, delimiter });
-        } else blk: {
-            break :blk try std.fmt.allocPrint(self.alloc, "NICK {s}{s}", .{ nickname, delimiter });
-        };
-        defer self.alloc.free(raw_msg);
-
-        try self.send(raw_msg);
+        if (hopcount) |hopcount_val| {
+            try self.sendCommand("NICK {s} {d}{s}", .{ nickname, hopcount_val, delimiter });
+        } else {
+            try self.sendCommand("NICK {s}{s}", .{ nickname, delimiter });
+        }
     }
 
     pub fn join(self: *Client, channel: []const u8) !void {
-        const raw_msg = try std.fmt.allocPrint(self.alloc, "JOIN {s}{s}", .{ channel, delimiter });
-        defer self.alloc.free(raw_msg);
-
-        try self.send(raw_msg);
+        try self.sendCommand("JOIN {s}{s}", .{ channel, delimiter });
     }
 
     pub fn part(self: *Client, channels: []const u8, reason: ?[]const u8) !void {
-        const raw_msg = try std.fmt.allocPrint(self.alloc, "PART {s} :{s}{s}", .{ channels, reason orelse "", delimiter });
-        defer self.alloc.free(raw_msg);
-
-        try self.send(raw_msg);
+        try self.sendCommand("PART {s} :{s}{s}", .{ channels, reason orelse "", delimiter });
     }
 
     pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
-        const raw_msg = try std.fmt.allocPrint(self.alloc, "PRIVMSG {s} :{s}{s}", .{ target, text, delimiter });
-        defer self.alloc.free(raw_msg);
-
-        try self.send(raw_msg);
+        try self.sendCommand("PRIVMSG {s} :{s}{s}", .{ target, text, delimiter });
     }
 
-    fn send(self: *Client, raw_msg: []const u8) !void {
+    fn sendCommand(self: *Client, comptime cmd_fmt: []const u8, args: anytype) !void {
+        const raw_msg = try std.fmt.allocPrint(self.alloc, cmd_fmt, args);
+        defer self.alloc.free(raw_msg);
+
         _ = switch (self.cfg.tls) {
             true => try self.connection.write(raw_msg),
             false => try self.stream.write(raw_msg),
