@@ -7,7 +7,7 @@ pub const Message = union(enum) {
         channels: []const u8,
     },
     NICK: struct {
-        nick: []const u8,
+        nickname: []const u8,
         hopcount: ?u8,
     },
     PRIVMSG: struct {
@@ -180,7 +180,7 @@ pub const ProtoMessage = struct {
             },
             .NICK => return Message{
                 .NICK = .{
-                    .nick = self.params.next() orelse "",
+                    .nickname = self.params.next() orelse "",
                     .hopcount = std.fmt.parseUnsigned(u8, self.params.next() orelse "", 10) catch null,
                 },
             },
@@ -256,5 +256,25 @@ test "parse part message with prefix" {
     try expect(msg.command == .PART);
     try expect(std.mem.eql(u8, params.next().?, "#channel"));
     try expect(std.mem.eql(u8, params.next().?, "goodbye!"));
+    try expect(params.next() == null);
+}
+
+test "parse nick message without prefix" {
+    const msg = try ProtoMessage.parse("NICK mynick 255");
+    var params = msg.params;
+    try expect(msg.prefix == null);
+    try expect(msg.command == .NICK);
+    try expect(std.mem.eql(u8, params.next().?, "mynick"));
+    try expect(std.mem.eql(u8, params.next().?, "255"));
+    try expect(params.next() == null);
+}
+
+test "parse nick message with prefix" {
+    const msg = try ProtoMessage.parse(":nick!user@host NICK mynick 255");
+    var params = msg.params;
+    try expect(std.mem.eql(u8, msg.prefix.?, "nick!user@host"));
+    try expect(msg.command == .NICK);
+    try expect(std.mem.eql(u8, params.next().?, "mynick"));
+    try expect(std.mem.eql(u8, params.next().?, "255"));
     try expect(params.next() == null);
 }

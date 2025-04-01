@@ -110,6 +110,20 @@ pub const Client = struct {
         };
     }
 
+    pub fn nick(self: *Client, nickname: []const u8, hopcount: ?u8) !void {
+        const raw_msg = if (hopcount) |hopcount_value| blk: {
+            break :blk try std.fmt.allocPrint(self.alloc, "NICK {s} {d}{s}", .{ nickname, hopcount_value, delimiter });
+        } else blk: {
+            break :blk try std.fmt.allocPrint(self.alloc, "NICK {s}{s}", .{ nickname, delimiter });
+        };
+        defer self.alloc.free(raw_msg);
+
+        _ = switch (self.cfg.tls) {
+            true => try self.connection.write(raw_msg),
+            false => try self.stream.write(raw_msg),
+        };
+    }
+
     pub fn join(self: *Client, channel: []const u8) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, "JOIN {s}{s}", .{ channel, delimiter });
         defer self.alloc.free(raw_msg);
@@ -231,6 +245,9 @@ pub const Client = struct {
                 const reply = self.replies.pop() orelse return;
 
                 switch (reply) {
+                    .NICK => |args| {
+                        try self.nick(args.nickname, args.hopcount);
+                    },
                     .PRIVMSG => |args| {
                         try self.privmsg(args.targets, args.text);
                     },
