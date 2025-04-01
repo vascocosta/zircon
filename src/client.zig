@@ -111,8 +111,8 @@ pub const Client = struct {
     }
 
     pub fn nick(self: *Client, nickname: []const u8, hopcount: ?u8) !void {
-        const raw_msg = if (hopcount) |hopcount_value| blk: {
-            break :blk try std.fmt.allocPrint(self.alloc, "NICK {s} {d}{s}", .{ nickname, hopcount_value, delimiter });
+        const raw_msg = if (hopcount) |hopcount_val| blk: {
+            break :blk try std.fmt.allocPrint(self.alloc, "NICK {s} {d}{s}", .{ nickname, hopcount_val, delimiter });
         } else blk: {
             break :blk try std.fmt.allocPrint(self.alloc, "NICK {s}{s}", .{ nickname, delimiter });
         };
