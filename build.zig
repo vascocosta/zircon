@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) void {
         docs_step.dependOn(&b.addInstallDirectory(.{
             .source_dir = docs,
             .install_dir = .prefix,
-            .install_subdir = "docs",
+            .install_subdir = "../docs",
         }).step);
     }
 }
