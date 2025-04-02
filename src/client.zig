@@ -9,6 +9,7 @@ const default_port = 6667;
 const delimiter = "\r\n";
 const max_msg_len = 512;
 
+/// The client connection to the IRC server.
 pub const Client = struct {
     pub const Config = struct {
         user: []const u8,
@@ -38,6 +39,7 @@ pub const Client = struct {
     cond: std.Thread.Condition,
     cfg: Config,
 
+    /// Initialize the Client with an allocator and a configuration.
     pub fn init(alloc: std.mem.Allocator, cfg: Config) !Client {
         return .{
             .alloc = alloc,
@@ -51,12 +53,14 @@ pub const Client = struct {
         };
     }
 
+    /// Deinitialize the Client.
     pub fn deinit(self: *Client) void {
         self.disconnect();
         self.buf.deinit();
         self.replies.deinit();
     }
 
+    /// Connect to the IRC server.
     pub fn connect(self: *Client) !void {
         self.stream = try std.net.tcpConnectToHost(
             self.alloc,
@@ -73,6 +77,7 @@ pub const Client = struct {
         utils.debug("Connected\n", .{});
     }
 
+    /// Disconnect from the IRC server.
     pub fn disconnect(self: *Client) void {
         if (self.cfg.tls) {
             self.connection.close() catch |err| {
