@@ -27,6 +27,10 @@ pub const Message = union(enum) {
 /// Represents a semi-parsed IRC protocol message.
 /// This is a lower level type where the message params is still an iterator.
 pub const ProtoMessage = struct {
+    prefix: ?[]const u8,
+    command: Command,
+    params: ParamIterator,
+
     /// Error type for message parsing failures.
     const MessageError = error{
         ParseError,
@@ -106,11 +110,18 @@ pub const ProtoMessage = struct {
         params: ?[]const u8,
         index: usize = 0,
 
+        /// Initializes a new parameter iterator.
+        pub fn init(params: ?[]const u8) ParamIterator {
+            return .{
+                .params = params,
+                .index = 0,
+            };
+        }
+
         /// Returns the next parameter, if available.
         pub fn next(self: *ParamIterator) ?[]const u8 {
             const params = self.params orelse return null;
             const start = self.index;
-
             while (self.index <= params.len) {
                 if (self.index == params.len) {
                     const item = params[start..self.index];
@@ -138,25 +149,12 @@ pub const ProtoMessage = struct {
 
             return null;
         }
-
-        /// Initializes a new parameter iterator.
-        pub fn init(params: ?[]const u8) ParamIterator {
-            return .{
-                .params = params,
-                .index = 0,
-            };
-        }
     };
-
-    prefix: ?[]const u8,
-    command: Command,
-    params: ParamIterator,
 
     /// Parses a raw IRC message into a `ProtoMessage`.
     pub fn parse(raw_msg: []const u8) !ProtoMessage {
-        var rest: []const u8 = std.mem.trim(u8, raw_msg, &std.ascii.whitespace);
-
         // If the message is shorter than a numeric code, bail out soon.
+        var rest: []const u8 = std.mem.trim(u8, raw_msg, &std.ascii.whitespace);
         if (rest.len < 3) {
             return MessageError.ParseError;
         }
