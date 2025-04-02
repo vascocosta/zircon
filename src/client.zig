@@ -1,3 +1,5 @@
+/// IRC Client implementation with TLS support.
+/// This module provides an IRC client that can connect, authenticate, and send messages.
 const std = @import("std");
 const tls = @import("tls");
 
@@ -9,8 +11,9 @@ const default_port = 6667;
 const delimiter = "\r\n";
 const max_msg_len = 512;
 
-/// The client connection to the IRC server.
+/// Represents an IRC client.
 pub const Client = struct {
+    /// Configuration for the IRC client.
     pub const Config = struct {
         user: []const u8,
         nick: []const u8,
@@ -21,6 +24,7 @@ pub const Client = struct {
         channels: [][]const u8,
     };
 
+    /// Configuration for the main loop of the IRC client.
     const LoopConfig = struct {
         fn defaultSpawnThread(_: Message) bool {
             return false;
@@ -39,7 +43,12 @@ pub const Client = struct {
     cond: std.Thread.Condition,
     cfg: Config,
 
-    /// Initialize the Client with an allocator and a configuration.
+    /// Initializes a new IRC client.
+    ///
+    /// - `alloc`: Memory allocator.
+    /// - `cfg`: Client configuration.
+    ///
+    /// Returns: A new `Client` instance or an error.
     pub fn init(alloc: std.mem.Allocator, cfg: Config) !Client {
         return .{
             .alloc = alloc,
@@ -53,14 +62,14 @@ pub const Client = struct {
         };
     }
 
-    /// Deinitialize the Client.
+    /// Deinitializes the client, freeing resources.
     pub fn deinit(self: *Client) void {
         self.disconnect();
         self.buf.deinit();
         self.replies.deinit();
     }
 
-    /// Connect to the IRC server.
+    /// Establishes a connection to the IRC server.
     pub fn connect(self: *Client) !void {
         self.stream = try std.net.tcpConnectToHost(
             self.alloc,
@@ -77,7 +86,7 @@ pub const Client = struct {
         utils.debug("Connected\n", .{});
     }
 
-    /// Disconnect from the IRC server.
+    /// Disconnects from the IRC server.
     pub fn disconnect(self: *Client) void {
         if (self.cfg.tls) {
             self.connection.close() catch |err| {
@@ -89,10 +98,12 @@ pub const Client = struct {
         utils.debug("Disconnected\n", .{});
     }
 
+    /// Sends a PONG response to the server.
     fn pong(self: *Client, id: []const u8) !void {
         try self.sendCommand("PONG :{s}{s}", .{ id, delimiter });
     }
 
+    /// Registers the client with the IRC server.
     pub fn register(self: *Client) !void {
         try self.sendCommand("NICK {s}{s}USER {s} * * :{s}{s}", .{
             self.cfg.nick,
@@ -103,6 +114,10 @@ pub const Client = struct {
         });
     }
 
+    /// Changes the nickname of the client.
+    ///
+    /// - `nickname`: New nickname.
+    /// - `hopcount`: Optional hop count value.
     pub fn nick(self: *Client, nickname: []const u8, hopcount: ?u8) !void {
         if (hopcount) |hopcount_val| {
             try self.sendCommand("NICK {s} {d}{s}", .{ nickname, hopcount_val, delimiter });
@@ -111,14 +126,25 @@ pub const Client = struct {
         }
     }
 
+    /// Joins an IRC channel.
+    ///
+    /// - `channel`: channel to join.
     pub fn join(self: *Client, channel: []const u8) !void {
         try self.sendCommand("JOIN {s}{s}", .{ channel, delimiter });
     }
 
+    /// Leaves an IRC channel.
+    ///
+    /// - `channels`: Channels to leave.
+    /// - `reason`: Optional reason for leaving.
     pub fn part(self: *Client, channels: []const u8, reason: ?[]const u8) !void {
         try self.sendCommand("PART {s} :{s}{s}", .{ channels, reason orelse "", delimiter });
     }
 
+    /// Sends a private message to a user or channel.
+    ///
+    /// - `target`: Target user or channel.
+    /// - `text`: Message content.
     pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
         try self.sendCommand("PRIVMSG {s} :{s}{s}", .{ target, text, delimiter });
     }
@@ -182,12 +208,16 @@ pub const Client = struct {
         }
     }
 
+    /// The main event loop for reading messages.
+    ///
+    /// - `loop_config`: Main event loop configuration.
     pub fn loop(self: *Client, loop_config: LoopConfig) !void {
         const thread = try std.Thread.spawn(.{}, writeLoop, .{self});
         thread.detach();
         try self.readLoop(loop_config);
     }
 
+    /// Reads messages from the server and processes them.
     fn readLoop(self: *Client, loop_config: LoopConfig) !void {
         while (true) {
             switch (self.cfg.tls) {
@@ -215,6 +245,7 @@ pub const Client = struct {
         }
     }
 
+    /// Writes messages from the server and processes them.
     fn writeLoop(self: *Client) !void {
         while (true) {
             self.mutex.lock();
