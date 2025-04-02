@@ -1,5 +1,5 @@
-/// IRC Client implementation with TLS support.
-/// This module provides an IRC client that can connect, authenticate, and send messages.
+//! IRC Client implementation with TLS support.
+//! This module provides an IRC client that can connect, authenticate, and send messages.
 const std = @import("std");
 const tls = @import("tls");
 
