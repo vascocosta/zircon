@@ -17,7 +17,9 @@ Make sure you read the examples section below to understand in more detail how t
 * Simple API
 * TLS support
 
-# Examples
+# Usage
+
+[API Documentation](https://vascocosta.github.io/zircon/)
 
 ## Simple IRC bot
 
