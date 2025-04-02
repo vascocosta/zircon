@@ -13,6 +13,15 @@ const max_msg_len = 512;
 
 /// Represents an IRC client.
 pub const Client = struct {
+    alloc: std.mem.Allocator,
+    stream: std.net.Stream,
+    connection: tls.Connection(std.net.Stream),
+    buf: std.ArrayList(u8),
+    replies: std.ArrayList(Message),
+    mutex: std.Thread.Mutex,
+    cond: std.Thread.Condition,
+    cfg: Config,
+
     /// Configuration for the IRC client.
     pub const Config = struct {
         user: []const u8,
@@ -33,15 +42,6 @@ pub const Client = struct {
         msg_callback: ?fn (Message) ?Message = null,
         spawn_thread: fn (Message) bool = defaultSpawnThread,
     };
-
-    alloc: std.mem.Allocator,
-    stream: std.net.Stream,
-    connection: tls.Connection(std.net.Stream),
-    buf: std.ArrayList(u8),
-    replies: std.ArrayList(Message),
-    mutex: std.Thread.Mutex,
-    cond: std.Thread.Condition,
-    cfg: Config,
 
     /// Initializes a new IRC client.
     ///
@@ -218,6 +218,8 @@ pub const Client = struct {
     }
 
     /// Reads messages from the server and processes them.
+    ///
+    /// - `loop_config`: Main event loop configuration.
     fn readLoop(self: *Client, loop_config: LoopConfig) !void {
         while (true) {
             switch (self.cfg.tls) {
@@ -237,6 +239,7 @@ pub const Client = struct {
                 return;
             }
 
+            // Handle the message previously read and stored in the buffer.
             try self.handleMessage(self.buf.items[0..self.buf.items.len], loop_config);
 
             // Clear the client's buffer at the end of the loop.
