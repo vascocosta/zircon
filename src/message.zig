@@ -1,7 +1,10 @@
+//! This module defines the message structures used by the IRC client.
 const std = @import("std");
 
 const expect = std.testing.expect;
 
+/// Represents a fully parsed IRC protocol message.
+/// This is a higher level type built from `ProtoMessage` to be easily used.
 pub const Message = union(enum) {
     JOIN: struct {
         channels: []const u8,
@@ -21,12 +24,16 @@ pub const Message = union(enum) {
     NOMSG: void,
 };
 
+/// Represents a semi-parsed IRC protocol message.
+/// This is a lower level type where the message params is still an iterator.
 pub const ProtoMessage = struct {
+    /// Error type for message parsing failures.
     const MessageError = error{
         ParseError,
         UnknownError,
     };
 
+    /// Enumerates all possible IRC commands.
     const Command = enum {
         RPL_WELCOME,
         RPL_YOURHOST,
@@ -59,6 +66,7 @@ pub const ProtoMessage = struct {
         WHOIS,
         WHOWAS,
 
+        /// Static map of command strings to their enum representation.
         const map = std.StaticStringMap(Command).initComptime(.{
             .{ "001", .RPL_WELCOME },
             .{ "002", .RPL_YOURHOST },
@@ -93,10 +101,12 @@ pub const ProtoMessage = struct {
         });
     };
 
+    /// Iterator for extracting parameters from an IRC message.
     pub const ParamIterator = struct {
         params: ?[]const u8,
         index: usize = 0,
 
+        /// Returns the next parameter, if available.
         pub fn next(self: *ParamIterator) ?[]const u8 {
             const params = self.params orelse return null;
             const start = self.index;
@@ -129,6 +139,7 @@ pub const ProtoMessage = struct {
             return null;
         }
 
+        /// Initializes a new parameter iterator.
         pub fn init(params: ?[]const u8) ParamIterator {
             return .{
                 .params = params,
@@ -141,6 +152,7 @@ pub const ProtoMessage = struct {
     command: Command,
     params: ParamIterator,
 
+    /// Parses a raw IRC message into a `ProtoMessage`.
     pub fn parse(raw_msg: []const u8) !ProtoMessage {
         var rest: []const u8 = std.mem.trim(u8, raw_msg, &std.ascii.whitespace);
 
@@ -172,6 +184,7 @@ pub const ProtoMessage = struct {
         };
     }
 
+    /// Converts a `ProtoMessage` into a `Message` if possible.
     pub fn toMessage(self: *ProtoMessage) ?Message {
         switch (self.command) {
             .JOIN => return Message{
