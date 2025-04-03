@@ -157,6 +157,13 @@ pub const Client = struct {
         try self.sendCommand("PRIVMSG {s} :{s}{s}", .{ targets, text, delimiter });
     }
 
+    /// Quits the IRC server.
+    ///
+    /// - `reason`: Optional reason for quiting.
+    pub fn quit(self: *Client, reason: ?[]const u8) !void {
+        try self.sendCommand("QUIT :{s}{s}", .{ reason orelse "", delimiter });
+    }
+
     fn sendCommand(self: *Client, comptime cmd_fmt: []const u8, args: anytype) !void {
         const raw_msg = try std.fmt.allocPrint(self.alloc, cmd_fmt, args);
         defer self.alloc.free(raw_msg);
@@ -280,6 +287,9 @@ pub const Client = struct {
                     },
                     .PART => |args| {
                         try self.part(args.channels, args.reason);
+                    },
+                    .QUIT => |args| {
+                        try self.quit(args.reason);
                     },
                     else => {
                         utils.debug("Unsupported message type\n", .{});

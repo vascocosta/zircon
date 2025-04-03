@@ -25,6 +25,9 @@ pub const Message = union(enum) {
         channels: []const u8,
         reason: []const u8,
     },
+    QUIT: struct {
+        reason: []const u8,
+    },
     NOMSG: void,
 };
 
@@ -218,6 +221,11 @@ pub const ProtoMessage = struct {
                     .reason = self.params.next() orelse "",
                 },
             },
+            .QUIT => return Message{
+                .QUIT = .{
+                    .reason = self.params.next() orelse "",
+                },
+            },
             else => return null,
         }
     }
@@ -318,5 +326,23 @@ test "parse nick message with prefix" {
     try expect(msg.command == .NICK);
     try expect(std.mem.eql(u8, params.next().?, "mynick"));
     try expect(std.mem.eql(u8, params.next().?, "255"));
+    try expect(params.next() == null);
+}
+
+test "parse quit message without prefix" {
+    const msg = try ProtoMessage.parse("QUIT :goodbye!");
+    var params = msg.params;
+    try expect(msg.prefix == null);
+    try expect(msg.command == .QUIT);
+    try expect(std.mem.eql(u8, params.next().?, "goodbye!"));
+    try expect(params.next() == null);
+}
+
+test "parse quit message with prefix" {
+    const msg = try ProtoMessage.parse(":nick!user@host QUIT :goodbye!");
+    var params = msg.params;
+    try expect(std.mem.eql(u8, msg.prefix.?, "nick!user@host"));
+    try expect(msg.command == .QUIT);
+    try expect(std.mem.eql(u8, params.next().?, "goodbye!"));
     try expect(params.next() == null);
 }
