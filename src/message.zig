@@ -194,6 +194,12 @@ pub const ProtoMessage = struct {
                     .channels = self.params.next() orelse "",
                 },
             },
+            .NOTICE => return Message{
+                .NOTICE = .{
+                    .targets = self.params.next() orelse "",
+                    .text = self.params.next() orelse "",
+                },
+            },
             .NICK => return Message{
                 .NICK = .{
                     .nickname = self.params.next() orelse "",
