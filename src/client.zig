@@ -240,11 +240,11 @@ pub const Client = struct {
             switch (self.cfg.tls) {
                 true => {
                     const reader = self.connection.reader();
-                    try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
+                    reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len) catch return;
                 },
                 false => {
                     const reader = self.stream.reader();
-                    try reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len);
+                    reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len) catch return;
                 },
             }
 
