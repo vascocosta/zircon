@@ -128,14 +128,22 @@ pub const Client = struct {
 
     /// Joins an IRC channel.
     ///
-    /// - `channel`: channel to join.
-    pub fn join(self: *Client, channel: []const u8) !void {
-        try self.sendCommand("JOIN {s}{s}", .{ channel, delimiter });
+    /// - `channels`: channel(s) to join.
+    pub fn join(self: *Client, channels: []const u8) !void {
+        try self.sendCommand("JOIN {s}{s}", .{ channels, delimiter });
+    }
+
+    /// Sends a notice message to a user or channel.
+    ///
+    /// - `targets`: Target user(s) or channel(s).
+    /// - `text`: Message content.
+    pub fn notice(self: *Client, targets: []const u8, text: []const u8) !void {
+        try self.sendCommand("NOTICE {s} :{s}{s}", .{ targets, text, delimiter });
     }
 
     /// Leaves an IRC channel.
     ///
-    /// - `channels`: Channels to leave.
+    /// - `channels`: Channel(s) to leave.
     /// - `reason`: Optional reason for leaving.
     pub fn part(self: *Client, channels: []const u8, reason: ?[]const u8) !void {
         try self.sendCommand("PART {s} :{s}{s}", .{ channels, reason orelse "", delimiter });
@@ -143,10 +151,10 @@ pub const Client = struct {
 
     /// Sends a private message to a user or channel.
     ///
-    /// - `target`: Target user or channel.
+    /// - `targets`: Target user(s) or channel(s).
     /// - `text`: Message content.
-    pub fn privmsg(self: *Client, target: []const u8, text: []const u8) !void {
-        try self.sendCommand("PRIVMSG {s} :{s}{s}", .{ target, text, delimiter });
+    pub fn privmsg(self: *Client, targets: []const u8, text: []const u8) !void {
+        try self.sendCommand("PRIVMSG {s} :{s}{s}", .{ targets, text, delimiter });
     }
 
     fn sendCommand(self: *Client, comptime cmd_fmt: []const u8, args: anytype) !void {
