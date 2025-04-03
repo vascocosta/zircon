@@ -269,6 +269,9 @@ pub const Client = struct {
                     .NICK => |args| {
                         try self.nick(args.nickname, args.hopcount);
                     },
+                    .NOTICE => |args| {
+                        try self.notice(args.targets, args.text);
+                    },
                     .PRIVMSG => |args| {
                         try self.privmsg(args.targets, args.text);
                     },
