@@ -88,6 +88,11 @@ pub const Client = struct {
 
     /// Disconnects from the IRC server.
     pub fn disconnect(self: *Client) void {
+        var buffer: [10]u8 = undefined;
+        const n = self.stream.readAll(buffer[0..]) catch return;
+        if (n == 0) {
+            return;
+        }
         if (self.cfg.tls) {
             self.connection.close() catch |err| {
                 utils.debug("Could not close connection: {}\n", .{err});
