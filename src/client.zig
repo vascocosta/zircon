@@ -43,18 +43,31 @@ pub const Client = struct {
         spawn_thread: fn (Message) bool = defaultSpawnThread,
     };
 
+    /// Error set for the Client struct.
+    pub const ClientError = error{
+        ConnectionFailed,
+        MemoryAllocationFailed,
+        NetowkrReadFailed,
+        NetworkWriteFailed,
+        ThreadSpawnFailed,
+        TlsHandshakeFailed,
+    };
+
     /// Initializes a new IRC client.
     ///
     /// - `alloc`: Memory allocator.
     /// - `cfg`: Client configuration.
     ///
     /// Returns: A new `Client` instance or an error.
-    pub fn init(alloc: std.mem.Allocator, cfg: Config) !Client {
+    pub fn init(alloc: std.mem.Allocator, cfg: Config) ClientError!Client {
         return .{
             .alloc = alloc,
             .stream = undefined,
             .connection = undefined,
-            .buf = try std.ArrayList(u8).initCapacity(alloc, max_msg_len),
+            .buf = std.ArrayList(u8).initCapacity(alloc, max_msg_len) catch |err| {
+                utils.debug("Memory allocation failed: {}", .{err});
+                return ClientError.MemoryAllocationFailed;
+            },
             .replies = std.ArrayList(Message).init(alloc),
             .mutex = std.Thread.Mutex{},
             .cond = std.Thread.Condition{},
@@ -70,18 +83,30 @@ pub const Client = struct {
     }
 
     /// Establishes a connection to the IRC server.
-    pub fn connect(self: *Client) !void {
-        self.stream = try std.net.tcpConnectToHost(
+    pub fn connect(self: *Client) ClientError!void {
+        // Normal unencrypted TCP connection.
+        self.stream = std.net.tcpConnectToHost(
             self.alloc,
             self.cfg.server,
             self.cfg.port orelse default_port,
-        );
+        ) catch |err| {
+            utils.debug("Connection failed: {}\n", .{err});
+            return ClientError.ConnectionFailed;
+        };
+
+        // TLS handshake process wrapping a TCP stream.
         if (self.cfg.tls) {
-            const root_ca = try tls.config.CertBundle.fromSystem(self.alloc);
-            self.connection = try tls.client(self.stream, .{
+            const root_ca = tls.config.CertBundle.fromSystem(self.alloc) catch |err| {
+                utils.debug("Could not get root CA: {}", .{err});
+                return ClientError.TlsHandshakeFailed;
+            };
+            self.connection = tls.client(self.stream, .{
                 .host = self.cfg.server,
                 .root_ca = root_ca,
-            });
+            }) catch |err| {
+                utils.debug("TLS handshake failed: {}", .{err});
+                return ClientError.TlsHandshakeFailed;
+            };
         }
         utils.debug("Connected\n", .{});
     }
@@ -104,12 +129,12 @@ pub const Client = struct {
     }
 
     /// Sends a PONG response to the server.
-    fn pong(self: *Client, id: []const u8) !void {
+    fn pong(self: *Client, id: []const u8) ClientError!void {
         try self.sendCommand("PONG :{s}{s}", .{ id, delimiter });
     }
 
     /// Registers the client with the IRC server.
-    pub fn register(self: *Client) !void {
+    pub fn register(self: *Client) ClientError!void {
         try self.sendCommand("NICK {s}{s}USER {s} * * :{s}{s}", .{
             self.cfg.nick,
             delimiter,
@@ -123,7 +148,7 @@ pub const Client = struct {
     ///
     /// - `nickname`: New nickname.
     /// - `hopcount`: Optional hop count value.
-    pub fn nick(self: *Client, nickname: []const u8, hopcount: ?u8) !void {
+    pub fn nick(self: *Client, nickname: []const u8, hopcount: ?u8) ClientError!void {
         if (hopcount) |hopcount_val| {
             try self.sendCommand("NICK {s} {d}{s}", .{ nickname, hopcount_val, delimiter });
         } else {
@@ -134,7 +159,7 @@ pub const Client = struct {
     /// Joins an IRC channel.
     ///
     /// - `channels`: channel(s) to join.
-    pub fn join(self: *Client, channels: []const u8) !void {
+    pub fn join(self: *Client, channels: []const u8) ClientError!void {
         try self.sendCommand("JOIN {s}{s}", .{ channels, delimiter });
     }
 
@@ -142,7 +167,7 @@ pub const Client = struct {
     ///
     /// - `targets`: Target user(s) or channel(s).
     /// - `text`: Message content.
-    pub fn notice(self: *Client, targets: []const u8, text: []const u8) !void {
+    pub fn notice(self: *Client, targets: []const u8, text: []const u8) ClientError!void {
         try self.sendCommand("NOTICE {s} :{s}{s}", .{ targets, text, delimiter });
     }
 
@@ -150,7 +175,7 @@ pub const Client = struct {
     ///
     /// - `channels`: Channel(s) to leave.
     /// - `reason`: Optional reason for leaving.
-    pub fn part(self: *Client, channels: []const u8, reason: ?[]const u8) !void {
+    pub fn part(self: *Client, channels: []const u8, reason: ?[]const u8) ClientError!void {
         try self.sendCommand("PART {s} :{s}{s}", .{ channels, reason orelse "", delimiter });
     }
 
@@ -158,40 +183,48 @@ pub const Client = struct {
     ///
     /// - `targets`: Target user(s) or channel(s).
     /// - `text`: Message content.
-    pub fn privmsg(self: *Client, targets: []const u8, text: []const u8) !void {
+    pub fn privmsg(self: *Client, targets: []const u8, text: []const u8) ClientError!void {
         try self.sendCommand("PRIVMSG {s} :{s}{s}", .{ targets, text, delimiter });
     }
 
     /// Quits the IRC server.
     ///
     /// - `reason`: Optional reason for quiting.
-    pub fn quit(self: *Client, reason: ?[]const u8) !void {
+    pub fn quit(self: *Client, reason: ?[]const u8) ClientError!void {
         try self.sendCommand("QUIT :{s}{s}", .{ reason orelse "", delimiter });
     }
 
-    fn sendCommand(self: *Client, comptime cmd_fmt: []const u8, args: anytype) !void {
-        const raw_msg = try std.fmt.allocPrint(self.alloc, cmd_fmt, args);
+    fn sendCommand(self: *Client, comptime cmd_fmt: []const u8, args: anytype) ClientError!void {
+        const raw_msg = std.fmt.allocPrint(self.alloc, cmd_fmt, args) catch |err| {
+            utils.debug("Memory allocation failed: {}", .{err});
+            return ClientError.MemoryAllocationFailed;
+        };
         defer self.alloc.free(raw_msg);
 
         _ = switch (self.cfg.tls) {
-            true => try self.connection.write(raw_msg),
-            false => try self.stream.write(raw_msg),
+            true => self.connection.write(raw_msg) catch |err| {
+                utils.debug("Network write failed: {}", .{err});
+                return ClientError.NetworkWriteFailed;
+            },
+            false => self.stream.write(raw_msg) catch |err| {
+                utils.debug("Network write failed: {}", .{err});
+                return ClientError.NetworkWriteFailed;
+            },
         };
     }
 
-    fn msgCallbackWorker(self: *Client, msg: Message, msg_callback: fn (Message) ?Message) !void {
+    fn msgCallbackWorker(self: *Client, msg: Message, msg_callback: fn (Message) ?Message) ClientError!void {
         const reply = msg_callback(msg) orelse return;
         self.mutex.lock();
-        try self.replies.append(reply);
+        self.replies.append(reply) catch |err| {
+            utils.debug("Memory allocation failed: {}", .{err});
+            return ClientError.MemoryAllocationFailed;
+        };
         self.mutex.unlock();
         self.cond.signal();
     }
 
-    fn handleMessage(
-        self: *Client,
-        raw_msg: []u8,
-        loop_config: LoopConfig,
-    ) !void {
+    fn handleMessage(self: *Client, raw_msg: []u8, loop_config: LoopConfig) ClientError!void {
         if (raw_msg.len < 4) {
             return;
         }
@@ -219,11 +252,17 @@ pub const Client = struct {
         const msg = proto_msg.toMessage() orelse return;
         if (loop_config.msg_callback) |msg_callback| {
             if (loop_config.spawn_thread(msg)) {
-                const thread = try std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, msg_callback });
+                const thread = std.Thread.spawn(.{}, msgCallbackWorker, .{ self, msg, msg_callback }) catch |err| {
+                    utils.debug("Thread spawn failed: {}", .{err});
+                    return ClientError.ThreadSpawnFailed;
+                };
                 utils.debug("Started message callback worker thread\n", .{});
                 thread.detach();
             } else {
-                try self.msgCallbackWorker(msg, msg_callback);
+                self.msgCallbackWorker(msg, msg_callback) catch |err| {
+                    utils.debug("Thread spawn failed: {}", .{err});
+                    return ClientError.ThreadSpawnFailed;
+                };
             }
         }
     }
@@ -231,8 +270,11 @@ pub const Client = struct {
     /// The main event loop for reading messages.
     ///
     /// - `loop_config`: Main event loop configuration.
-    pub fn loop(self: *Client, loop_config: LoopConfig) !void {
-        const thread = try std.Thread.spawn(.{}, writeLoop, .{self});
+    pub fn loop(self: *Client, loop_config: LoopConfig) ClientError!void {
+        const thread = std.Thread.spawn(.{}, writeLoop, .{self}) catch |err| {
+            utils.debug("Thread spawn failed: {}", .{err});
+            return ClientError.ThreadSpawnFailed;
+        };
         thread.detach();
         try self.readLoop(loop_config);
     }
@@ -240,7 +282,7 @@ pub const Client = struct {
     /// Reads messages from the server and processes them.
     ///
     /// - `loop_config`: Main event loop configuration.
-    fn readLoop(self: *Client, loop_config: LoopConfig) !void {
+    fn readLoop(self: *Client, loop_config: LoopConfig) ClientError!void {
         while (true) {
             switch (self.cfg.tls) {
                 true => {
@@ -269,7 +311,7 @@ pub const Client = struct {
     }
 
     /// Writes messages from the server and processes them.
-    fn writeLoop(self: *Client) !void {
+    fn writeLoop(self: *Client) ClientError!void {
         while (true) {
             self.mutex.lock();
             defer self.mutex.unlock();
