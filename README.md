@@ -27,10 +27,10 @@ Make sure you read the examples below to understand in more detail how this work
 const std = @import("std");
 const zircon = @import("zircon");
 
-/// Constants used to configure the client.
-const user = "zircon_bot";
-const nick = "zircon_bot";
-const real_name = "zircon_bot";
+/// Constants used to configure the bot.
+const user = "zirconbot";
+const nick = "zirconbot";
+const real_name = "zirconbot";
 const server = "irc.quakenet.org";
 const port = 6667;
 const tls = false;
@@ -90,14 +90,14 @@ fn msgCallback(message: zircon.Message) ?zircon.Message {
         .PRIVMSG => |msg| {
             if (std.mem.indexOf(u8, msg.text, prefix_char) != 0) return null;
 
-            if (Command.parse(msg.targets, msg.text)) |command| {
+            if (Command.parse(msg.prefix, msg.targets, msg.text)) |command| {
                 return command.handle();
             }
 
             return null;
         },
         .PART => |msg| {
-            if (std.mem.containsAtLeast(u8, msg.text, 1, "goodbye")) {
+            if (std.mem.containsAtLeast(u8, msg.reason, 1, "goodbye")) {
                 return zircon.Message{
                     .PRIVMSG = .{
                         .targets = msg.channels,
@@ -105,6 +105,12 @@ fn msgCallback(message: zircon.Message) ?zircon.Message {
                     },
                 };
             }
+        },
+        .NICK => |msg| {
+            return zircon.Message{ .PRIVMSG = .{
+                .targets = "#geeks",
+                .text = msg.nickname,
+            } };
         },
         else => return null,
     }
@@ -135,6 +141,7 @@ fn spawnThread(message: zircon.Message) bool {
 /// Command encapsulates each command that our IRC bot supports.
 pub const Command = struct {
     name: CommandName,
+    prefix: ?zircon.Prefix,
     params: []const u8,
     targets: []const u8,
 
@@ -150,12 +157,13 @@ pub const Command = struct {
         .{ "quit", CommandName.quit },
     });
 
-    pub fn parse(targets: []const u8, text: []const u8) ?Command {
+    pub fn parse(prefix: ?zircon.Prefix, targets: []const u8, text: []const u8) ?Command {
         var iter = std.mem.tokenizeAny(u8, text, &std.ascii.whitespace);
         const name = iter.next() orelse return null;
         if (name.len < 2) return null;
         return .{
             .name = map.get(name[1..]) orelse return null,
+            .prefix = prefix,
             .params = iter.rest(),
             .targets = targets,
         };
@@ -164,8 +172,8 @@ pub const Command = struct {
     pub fn handle(self: Command) ?zircon.Message {
         switch (self.name) {
             .echo => return echo(self.targets, self.params),
-            .help => return help(self.targets),
-            .quit => std.process.exit(0),
+            .help => return help(self.prefix, self.targets),
+            .quit => return quit(self.params),
         }
     }
 
@@ -178,11 +186,19 @@ pub const Command = struct {
         };
     }
 
-    fn help(targets: []const u8) ?zircon.Message {
+    fn help(prefix: ?zircon.Prefix, targets: []const u8) ?zircon.Message {
         return zircon.Message{
             .PRIVMSG = .{
-                .targets = targets,
+                .targets = if (prefix) |p| p.nick orelse targets else targets,
                 .text = "This is the help message!",
+            },
+        };
+    }
+
+    fn quit(params: []const u8) ?zircon.Message {
+        return zircon.Message{
+            .QUIT = .{
+                .reason = params,
             },
         };
     }
