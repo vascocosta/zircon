@@ -47,7 +47,7 @@ pub const Client = struct {
     pub const ClientError = error{
         ConnectionFailed,
         MemoryAllocationFailed,
-        NetowkrReadFailed,
+        NetworkReadFailed,
         NetworkWriteFailed,
         ThreadSpawnFailed,
         TlsHandshakeFailed,
