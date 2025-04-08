@@ -129,6 +129,8 @@ pub const Client = struct {
     }
 
     /// Sends a PONG response to the server.
+    ///
+    /// - `id`: PING message id.
     fn pong(self: *Client, id: []const u8) ClientError!void {
         try self.sendCommand("PONG :{s}{s}", .{ id, delimiter });
     }

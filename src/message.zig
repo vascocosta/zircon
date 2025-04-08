@@ -165,6 +165,8 @@ pub const ProtoMessage = struct {
     };
 
     /// Parses a raw IRC message into a `ProtoMessage`.
+    ///
+    /// - `raw_msg`: IRC message in raw format.
     pub fn parse(raw_msg: []const u8) !ProtoMessage {
         // Return early if the message is shorter than a numeric code.
         var rest: []const u8 = std.mem.trim(u8, raw_msg, &std.ascii.whitespace);
@@ -250,6 +252,9 @@ pub const Prefix = struct {
     user: ?[]const u8 = null,
     host: ?[]const u8 = null,
 
+    /// Parses a raw IRC message prefix into a `Prefix`.
+    ///
+    /// - `raw_prefix`: IRC message prefix in raw format.
     fn parse(raw_prefix: []const u8) ?Prefix {
         // Return early if the prefix string is empty.
         if (raw_prefix.len == 0) {
