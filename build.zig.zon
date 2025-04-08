@@ -1,6 +1,6 @@
 .{
     .name = .zircon,
-    .version = "0.4.0",
+    .version = "0.5.0",
     .fingerprint = 0x4c91bc618536d4fc,
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
