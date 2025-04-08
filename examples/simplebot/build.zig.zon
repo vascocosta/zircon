@@ -1,0 +1,15 @@
+.{
+    .name = .simplebot,
+    .version = "0.0.0",
+    .fingerprint = 0xafa430b4ba4994a6,
+    .dependencies = .{
+        .zircon = .{
+            .path = "../../",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
