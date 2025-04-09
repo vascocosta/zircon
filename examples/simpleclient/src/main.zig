@@ -2,13 +2,13 @@ const std = @import("std");
 const zircon = @import("zircon");
 
 /// Constants used to configure the bot.
-const user = "zirconbot";
-const nick = "zirconbot";
-const real_name = "zirconbot";
+const user = "zirconclient";
+const nick = "zirconclient";
+const real_name = "zirconclient";
 const server = "irc.quakenet.org";
 const port = 6667;
 const tls = false;
-var join_channels = [_][]const u8{"#aviation"};
+var join_channels = [_][]const u8{"#geeks"};
 
 /// Global Debug Allocator singleton.
 var debug_allocator = std.heap.DebugAllocator(.{}).init;
@@ -32,6 +32,13 @@ pub fn main() !void {
     // Connect to the IRC server and perform registration.
     try client.connect();
     try client.register();
+
+    std.debug.print("Connected...\n", .{});
+
+    // Spawn a thread to execute clientWorker with our client logic.
+    std.Thread.sleep(6000_000_000);
+    const client_worker = try std.Thread.spawn(.{}, clientWorker, .{&client});
+    client_worker.detach();
 
     // Enter the main loop that keeps reading incoming IRC messages forever.
     // The client loop accepts a LoopConfig struct with two optional fields.
@@ -59,7 +66,8 @@ fn msgCallback(message: zircon.Message) ?zircon.Message {
                     msg_nick = n;
                 }
             }
-            std.debug.print("{s} <{s}> {s}\n", .{ msg.targets, msg_nick, msg.text });
+            std.debug.print("\n[{s}] <{s}>: {s}\n", .{ msg.targets, msg_nick, msg.text });
+            std.debug.print("[{s}] <{s}>: ", .{ join_channels[0], nick });
             return null;
         },
         else => return null,
@@ -73,72 +81,22 @@ fn msgCallback(message: zircon.Message) ?zircon.Message {
 /// On this example we don't care about any particular kind of message.
 /// Since this is a more general client, the threading logic happens elsewhere.
 /// To spawn a thread we return true to the loop or false otherwise.
-fn spawnThread(message: zircon.Message) bool {
+fn spawnThread(_: zircon.Message) bool {
     return false;
 }
 
-/// Command encapsulates each command that our IRC bot supports.
-pub const Command = struct {
-    name: CommandName,
-    prefix: ?zircon.Prefix,
-    params: []const u8,
-    targets: []const u8,
+fn clientWorker(client: *zircon.Client) !void {
+    const allocator = debug_allocator.allocator();
+    const stdin_reader = std.io.getStdIn().reader();
+    while (true) {
+        std.debug.print("[{s}] <{s}>: ", .{ join_channels[0], nick });
+        const command = try stdin_reader.readUntilDelimiterAlloc(allocator, '\n', 512);
+        defer allocator.free(command);
 
-    pub const CommandName = enum {
-        echo,
-        help,
-        quit,
-    };
-
-    const map = std.StaticStringMap(Command.CommandName).initComptime(.{
-        .{ "echo", CommandName.echo },
-        .{ "help", CommandName.help },
-        .{ "quit", CommandName.quit },
-    });
-
-    pub fn parse(prefix: ?zircon.Prefix, targets: []const u8, text: []const u8) ?Command {
-        var iter = std.mem.tokenizeAny(u8, text, &std.ascii.whitespace);
-        const name = iter.next() orelse return null;
-        if (name.len < 2) return null;
-        return .{
-            .name = map.get(name[1..]) orelse return null,
-            .prefix = prefix,
-            .params = iter.rest(),
-            .targets = targets,
-        };
-    }
-
-    pub fn handle(self: Command) ?zircon.Message {
-        switch (self.name) {
-            .echo => return echo(self.targets, self.params),
-            .help => return help(self.prefix, self.targets),
-            .quit => return quit(self.params),
+        if (std.ascii.startsWithIgnoreCase(command, "/quit")) {
+            try client.quit(null);
+        } else {
+            try client.privmsg(join_channels[0], command);
         }
     }
-
-    fn echo(targets: []const u8, params: []const u8) ?zircon.Message {
-        return zircon.Message{
-            .PRIVMSG = .{
-                .targets = targets,
-                .text = params,
-            },
-        };
-    }
-
-    fn help(prefix: ?zircon.Prefix, targets: []const u8) ?zircon.Message {
-        return zircon.Message{
-            .PRIVMSG = .{
-                .targets = if (prefix) |p| p.nick orelse targets else targets,
-                .text = "This is the help message!",
-            },
-        };
-    }
-
-    fn quit(params: []const u8) ?zircon.Message {
-        return zircon.Message{
-            .QUIT = .{
-                .reason = params,
-            },
-        };
-    }
-};
+}
