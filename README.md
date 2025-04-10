@@ -12,16 +12,6 @@ The `zircon` library is easy to use, allowing the creation of either general IRC
 * TLS connection support
 * Minimal dependencies (TLS)
 
-# Build
-
-
-
-```
-git clone https://github.com/vascocosta/zircon.git
-cd zircon/examples/simplebot
-zig build -Doptimize=ReleaseSafe
-```
-
 # Usage
 
 [API Documentation](https://vascocosta.github.io/zircon/)
