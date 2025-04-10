@@ -20,7 +20,7 @@ The `zircon` library is easy to use, allowing the creation of either general IRC
 zig fetch --save git+https://github.com/vascocosta/zircon.git
 ```
 
-#### Configure zircon as a module in build.zig
+#### Configure zircon as a module in `build.zig`
 
 ```zig
 const std = @import("std");
