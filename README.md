@@ -58,7 +58,8 @@ The `zircon` library is easy to use, allowing the creation of either general IRC
     }
     ```
 
-    3. Import zircon into your code:
+3. Import zircon into your code:
+
     ```zig
     const zircon = @import("zircon");
     ```
