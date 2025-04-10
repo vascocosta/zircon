@@ -67,7 +67,7 @@ fn msgCallback(message: zircon.Message) ?zircon.Message {
                 }
             }
             std.debug.print("\n[{s}] <{s}>: {s}\n", .{ msg.targets, msg_nick, msg.text });
-            std.debug.print("[{s}] <{s}>: ", .{ join_channels[0], nick });
+            std.debug.print("[#] <{s}>: ", .{nick});
             return null;
         },
         else => return null,
@@ -85,18 +85,67 @@ fn spawnThread(_: zircon.Message) bool {
     return false;
 }
 
+/// This is where we define the logic of our IRC client (handling commands).
 fn clientWorker(client: *zircon.Client) !void {
     const allocator = debug_allocator.allocator();
     const stdin_reader = std.io.getStdIn().reader();
     while (true) {
-        std.debug.print("[{s}] <{s}>: ", .{ join_channels[0], nick });
-        const command = try stdin_reader.readUntilDelimiterAlloc(allocator, '\n', 512);
-        defer allocator.free(command);
+        std.debug.print("[#] <{s}>: ", .{nick});
+        const raw_command = try stdin_reader.readUntilDelimiterAlloc(allocator, '\n', 512);
+        defer allocator.free(raw_command);
 
-        if (std.ascii.startsWithIgnoreCase(command, "/quit")) {
-            try client.quit(null);
-        } else {
-            try client.privmsg(join_channels[0], command);
+        const command = Command.parse(raw_command) orelse continue;
+        switch (command.name) {
+            // /say <#target(s)> <text>
+            .say => {
+                var iter = std.mem.tokenizeAny(u8, command.params, &std.ascii.whitespace);
+                const targets = iter.next() orelse continue;
+                const text = iter.rest();
+                try client.privmsg(targets, text);
+            },
+            // /join <#channel(s)>
+            .join => {
+                try client.join(command.params);
+            },
+            // /part <#channel(s)> [reason]
+            .part => {
+                var iter = std.mem.tokenizeAny(u8, command.params, &std.ascii.whitespace);
+                const channels = iter.next() orelse continue;
+                const reason = iter.rest();
+                try client.part(channels, reason);
+            },
+            // /quit [reason]
+            .quit => try client.quit(command.params),
         }
     }
 }
+
+/// Command encapsulates each command that our IRC client supports.
+const Command = struct {
+    name: CommandName,
+    params: []const u8,
+
+    const CommandName = enum {
+        join,
+        part,
+        quit,
+        say,
+    };
+
+    const map = std.StaticStringMap(Command.CommandName).initComptime(.{
+        .{ "/join", CommandName.join },
+        .{ "/part", CommandName.part },
+        .{ "/quit", CommandName.quit },
+        .{ "/say", CommandName.say },
+    });
+
+    fn parse(raw_command: []const u8) ?Command {
+        var iter = std.mem.tokenizeAny(u8, raw_command, &std.ascii.whitespace);
+        const name = iter.next() orelse return null;
+        if (name.len < 2) return null;
+        return .{
+            .name = map.get(name) orelse return null,
+            .params = iter.rest(),
+        };
+    }
+};
