@@ -14,13 +14,13 @@ The `zircon` library is easy to use, allowing the creation of either general IRC
 
 # Installation
 
-## Save zircon as a dependency in `build.zig.zon` with zig fetch
+#### Save zircon as a dependency in `build.zig.zon` with zig fetch
 
 ```sh
-fetch --save git+https://github.com/vascocosta/zircon.git
+zig fetch --save git+https://github.com/vascocosta/zircon.git
 ```
 
-## Configure zircon as a module in build.zig
+#### Configure zircon as a module in build.zig
 
 ```zig
 const std = @import("std");
@@ -58,7 +58,7 @@ pub fn build(b: *std.Build) void {
 }
 ```
 
-## Import zircon into your code
+#### Import zircon into your code
 
 ```zig
 const zircon = @import("zircon");
