@@ -16,7 +16,9 @@ The `zircon` library is easy to use, allowing the creation of either general IRC
 
 1. Save zircon as a dependency in `build.zig.zon` with zig fetch:
 
-```zig fetch --save git+https://github.com/vascocosta/zircon.git```
+```sh
+fetch --save git+https://github.com/vascocosta/zircon.git
+```
 
 2. Configure zircon as a module in build.zig:
 
