@@ -15,13 +15,15 @@ The `zircon` library is easy to use, allowing the creation of either general IRC
 
 [API Documentation](https://vascocosta.github.io/zircon/)
 
-By design, the user of the library does not have to create any threads at all. The main client loop runs on the main thread and that loop calls the callback function pointed to by `msg_callback`. One simple way to use this library is to define this callback in the user code to customise how to reply to incoming IRC messages with your own IRC messages making use of `zircon.Message`. You can think of this callback pattern as something that triggers when a message event happens, letting you react with another message.
+By design, the user isn't required to create any threads for simple applications like a bot. The main client loop runs on the main thread and that loop calls the callback function pointed to by `msg_callback`. One way to use this library is to define this callback in the user code to customise how to reply to incoming IRC messages with your own IRC messages making use of `zircon.Message`. You can think of this callback pattern as something that triggers when a message event happens, letting you react with another message.
 
 By default this callback you define also runs on the main thread, but you can use the `spawn_thread` callback to override this quite easily, by returning true to automatically enable a worker thread depending on the kind of message received. This is especially useful for creating long running commands in a background thread, without the need to spawn it yourself.
 
-Make sure you read the examples below to understand in more detail how this works...
+For more complex use cases, like a general purpose client, you may want to create your own thread(s) to handle user input like commands. However, you should still use the main client loop and its `msg_callback` to handle incoming IRC messages. Make sure you read the two examples below to understand in more detail how `zircon` works in both scenarios...
 
-## Simple IRC bot
+## Examples
+
+### Simple IRC bot
 
 ```zig
 const std = @import("std");
@@ -205,7 +207,7 @@ pub const Command = struct {
 };
 ```
 
-## Simple IRC client
+### Simple IRC client
 
 ```zig
 const std = @import("std");
