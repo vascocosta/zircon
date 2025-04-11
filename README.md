@@ -11,6 +11,7 @@ The `zircon` library is easy to use, allowing the creation of either general IRC
 * Simple API (callback based)
 * TLS connection support
 * Minimal dependencies (TLS)
+* Extensive documentation
 
 # Installation
 
