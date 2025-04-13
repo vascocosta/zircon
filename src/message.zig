@@ -20,19 +20,34 @@ pub const Message = union(enum) {
         targets: []const u8,
         text: []const u8,
     },
-    PRIVMSG: struct {
-        prefix: ?Prefix = null,
-        targets: []const u8,
-        text: []const u8,
-    },
     PART: struct {
         prefix: ?Prefix = null,
         channels: []const u8,
         reason: ?[]const u8,
     },
+    PRIVMSG: struct {
+        prefix: ?Prefix = null,
+        targets: []const u8,
+        text: []const u8,
+    },
     QUIT: struct {
         prefix: ?Prefix = null,
         reason: ?[]const u8,
+    },
+    TOPIC: struct {
+        prefix: ?Prefix = null,
+        channel: []const u8,
+        text: ?[]const u8,
+    },
+    RPL_NOTOPIC: struct {
+        prefix: ?Prefix = null,
+        channel: []const u8,
+        text: []const u8,
+    },
+    RPL_TOPIC: struct {
+        prefix: ?Prefix = null,
+        channel: []const u8,
+        text: []const u8,
     },
     NOMSG: void,
 };
@@ -59,6 +74,7 @@ pub const ProtoMessage = struct {
         RPL_ISUPPORT,
 
         RPL_ENDOFWHO,
+        RPL_NOTOPIC,
         RPL_TOPIC,
         RPL_WHOREPLY,
         RPL_NAMREPLY,
@@ -92,6 +108,7 @@ pub const ProtoMessage = struct {
             .{ "005", .RPL_ISUPPORT },
 
             .{ "315", .RPL_ENDOFWHO },
+            .{ "331", .RPL_NOTOPIC },
             .{ "332", .RPL_TOPIC },
             .{ "352", .RPL_WHOREPLY },
             .{ "353", .RPL_NAMREPLY },
@@ -207,13 +224,6 @@ pub const ProtoMessage = struct {
                     .channels = self.params.next() orelse "",
                 },
             },
-            .NOTICE => return Message{
-                .NOTICE = .{
-                    .prefix = self.prefix,
-                    .targets = self.params.next() orelse "",
-                    .text = self.params.next() orelse "",
-                },
-            },
             .NICK => return Message{
                 .NICK = .{
                     .prefix = self.prefix,
@@ -221,8 +231,8 @@ pub const ProtoMessage = struct {
                     .hopcount = std.fmt.parseUnsigned(u8, self.params.next() orelse "", 10) catch null,
                 },
             },
-            .PRIVMSG => return Message{
-                .PRIVMSG = .{
+            .NOTICE => return Message{
+                .NOTICE = .{
                     .prefix = self.prefix,
                     .targets = self.params.next() orelse "",
                     .text = self.params.next() orelse "",
@@ -235,10 +245,38 @@ pub const ProtoMessage = struct {
                     .reason = self.params.next(),
                 },
             },
+            .PRIVMSG => return Message{
+                .PRIVMSG = .{
+                    .prefix = self.prefix,
+                    .targets = self.params.next() orelse "",
+                    .text = self.params.next() orelse "",
+                },
+            },
             .QUIT => return Message{
                 .QUIT = .{
                     .prefix = self.prefix,
                     .reason = self.params.next(),
+                },
+            },
+            .TOPIC => return Message{
+                .TOPIC = .{
+                    .prefix = self.prefix,
+                    .channel = self.params.next() orelse "",
+                    .text = self.params.next(),
+                },
+            },
+            .RPL_NOTOPIC => return Message{
+                .RPL_NOTOPIC = .{
+                    .prefix = self.prefix,
+                    .channel = self.params.next() orelse "",
+                    .text = self.params.next(),
+                },
+            },
+            .RPL_TOPIC => return Message{
+                .RPL_TOPIC = .{
+                    .prefix = self.prefix,
+                    .channel = self.params.next() orelse "",
+                    .text = self.params.next(),
                 },
             },
             else => return null,

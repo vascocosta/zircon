@@ -196,6 +196,17 @@ pub const Client = struct {
         try self.sendCommand("QUIT :{s}{s}", .{ reason orelse "", delimiter });
     }
 
+    /// Gets or sets the topic of a channel.
+    ///
+    /// - `text`: Optional topic to set.
+    pub fn topic(self: *Client, channel: []const u8, text: ?[]const u8) ClientError!void {
+        if (text != null and !std.mem.eql(u8, text.?, "")) {
+            try self.sendCommand("TOPIC {s} :{s}{s}", .{ channel, text.?, delimiter });
+        } else {
+            try self.sendCommand("TOPIC {s}{s}", .{ channel, delimiter });
+        }
+    }
+
     fn sendCommand(self: *Client, comptime cmd_fmt: []const u8, args: anytype) ClientError!void {
         const raw_msg = std.fmt.allocPrint(self.alloc, cmd_fmt, args) catch |err| {
             utils.debug("Memory allocation failed: {}", .{err});
@@ -339,6 +350,9 @@ pub const Client = struct {
                     },
                     .QUIT => |args| {
                         try self.quit(args.reason);
+                    },
+                    .TOPIC => |args| {
+                        try self.topic(args.channel, args.text);
                     },
                     else => {
                         utils.debug("Unsupported message type\n", .{});
