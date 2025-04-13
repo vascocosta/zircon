@@ -41,11 +41,13 @@ pub const Message = union(enum) {
     },
     RPL_NOTOPIC: struct {
         prefix: ?Prefix = null,
+        nick: []const u8,
         channel: []const u8,
         text: []const u8,
     },
     RPL_TOPIC: struct {
         prefix: ?Prefix = null,
+        nick: []const u8,
         channel: []const u8,
         text: []const u8,
     },
@@ -268,13 +270,15 @@ pub const ProtoMessage = struct {
             .RPL_NOTOPIC => return Message{
                 .RPL_NOTOPIC = .{
                     .prefix = self.prefix,
+                    .nick = self.params.next() orelse "",
                     .channel = self.params.next() orelse "",
-                    .text = self.params.next() orelse "",
+                    .text = self.params.next() orelse "Noo topic set.",
                 },
             },
             .RPL_TOPIC => return Message{
                 .RPL_TOPIC = .{
                     .prefix = self.prefix,
+                    .nick = self.params.next() orelse "",
                     .channel = self.params.next() orelse "",
                     .text = self.params.next() orelse "",
                 },
