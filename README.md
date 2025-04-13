@@ -153,13 +153,15 @@ fn msgCallback(message: zircon.Message) ?zircon.Message {
             return null;
         },
         .PART => |msg| {
-            if (std.mem.containsAtLeast(u8, msg.reason, 1, "goodbye")) {
-                return zircon.Message{
-                    .PRIVMSG = .{
-                        .targets = msg.channels,
-                        .text = "Goodbye for you too!",
-                    },
-                };
+            if (msg.reason) |msg_reason| {
+                if (std.mem.containsAtLeast(u8, msg_reason, 1, "goodbye")) {
+                    return zircon.Message{
+                        .PRIVMSG = .{
+                            .targets = msg.channels,
+                            .text = "Goodbye for you too!",
+                        },
+                    };
+                }
             }
         },
         .NICK => |msg| {
@@ -275,14 +277,14 @@ zig build -Doptimize=ReleaseSafe
 const std = @import("std");
 const zircon = @import("zircon");
 
-/// Constants used to configure the bot.
+/// Constants used to configure the client.
 const user = "zirconclient";
 const nick = "zirconclient";
 const real_name = "zirconclient";
 const server = "irc.quakenet.org";
 const port = 6667;
 const tls = false;
-var join_channels = [_][]const u8{"#geeks"};
+var join_channels = [_][]const u8{"#aviation"};
 
 /// Global Debug Allocator singleton.
 var debug_allocator = std.heap.DebugAllocator(.{}).init;
@@ -329,24 +331,36 @@ pub fn main() !void {
 /// msgCallback is called by zircon.Client.loop when a new IRC message arrives.
 /// The message parameter holds the IRC message that arrived from the server.
 /// You can switch on the message tagged union to reply based on its kind.
-/// On this example we only care about messages of type PRIVMSG.
+/// On this example we only care about messages of type JOIN, PART or PRIVMSG.
 /// We print the targets, nick and text of every message of type PRIVMSG.
 fn msgCallback(message: zircon.Message) ?zircon.Message {
     switch (message) {
+        .JOIN => |msg| {
+            const msg_nick = extractNick(msg.prefix);
+            std.debug.print("\n[{s}] {s} has joined.\n", .{ msg.channels, msg_nick });
+        },
+        .PART => |msg| {
+            const msg_nick = extractNick(msg.prefix);
+            std.debug.print("\n[{s}] {s} has left [{s}].\n", .{ msg.channels, msg_nick, msg.reason orelse "" });
+        },
         .PRIVMSG => |msg| {
-            var msg_nick: []const u8 = "N/A";
-            if (msg.prefix) |p| {
-                if (p.nick) |n| {
-                    msg_nick = n;
-                }
-            }
+            const msg_nick = extractNick(msg.prefix);
             std.debug.print("\n[{s}] <{s}>: {s}\n", .{ msg.targets, msg_nick, msg.text });
-            std.debug.print("[#] <{s}>: ", .{nick});
-            return null;
         },
         else => return null,
     }
+
+    std.debug.print("[#] <{s}>: ", .{nick});
+
     return null;
+}
+
+/// Helper function to extract the nick from a prefix.
+fn extractNick(prefix: ?zircon.Prefix) []const u8 {
+    return if (prefix) |p|
+        if (p.nick) |n| n else "N/A"
+    else
+        "NA";
 }
 
 /// spawnThread is called by zircon.Client.loop to decide when to spawn a thread.
