@@ -71,13 +71,15 @@ fn msgCallback(message: zircon.Message) ?zircon.Message {
             return null;
         },
         .PART => |msg| {
-            if (std.mem.containsAtLeast(u8, msg.reason, 1, "goodbye")) {
-                return zircon.Message{
-                    .PRIVMSG = .{
-                        .targets = msg.channels,
-                        .text = "Goodbye for you too!",
-                    },
-                };
+            if (msg.reason) |msg_reason| {
+                if (std.mem.containsAtLeast(u8, msg_reason, 1, "goodbye")) {
+                    return zircon.Message{
+                        .PRIVMSG = .{
+                            .targets = msg.channels,
+                            .text = "Goodbye for you too!",
+                        },
+                    };
+                }
             }
         },
         .NICK => |msg| {
