@@ -28,11 +28,11 @@ pub const Message = union(enum) {
     PART: struct {
         prefix: ?Prefix = null,
         channels: []const u8,
-        reason: []const u8,
+        reason: ?[]const u8,
     },
     QUIT: struct {
         prefix: ?Prefix = null,
-        reason: []const u8,
+        reason: ?[]const u8,
     },
     NOMSG: void,
 };
@@ -232,13 +232,13 @@ pub const ProtoMessage = struct {
                 .PART = .{
                     .prefix = self.prefix,
                     .channels = self.params.next() orelse "",
-                    .reason = self.params.next() orelse "",
+                    .reason = self.params.next(),
                 },
             },
             .QUIT => return Message{
                 .QUIT = .{
                     .prefix = self.prefix,
-                    .reason = self.params.next() orelse "",
+                    .reason = self.params.next(),
                 },
             },
             else => return null,
