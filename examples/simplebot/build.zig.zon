@@ -4,8 +4,8 @@
     .fingerprint = 0xafa430b4ba4994a6,
     .dependencies = .{
         .zircon = .{
-            .url = "git+https://github.com/vascocosta/zircon.git#855a40ac22a45086c02527521c785a79716fc602",
-            .hash = "zircon-0.5.3-_NQ2hdGmAAAiYGhAX8FVr0dqMj19nQBc3h2w8YIe1beM",
+            .url = "git+https://github.com/vascocosta/zircon.git#224f200f4947e1f090ac430dfe7974df192f4395",
+            .hash = "zircon-0.5.4-_NQ2hdGmAACKg6RHNe075rYSKelG-BPwjeis6PUWkjO9",
         },
     },
     .paths = .{
