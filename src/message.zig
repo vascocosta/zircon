@@ -269,14 +269,14 @@ pub const ProtoMessage = struct {
                 .RPL_NOTOPIC = .{
                     .prefix = self.prefix,
                     .channel = self.params.next() orelse "",
-                    .text = self.params.next(),
+                    .text = self.params.next() orelse "",
                 },
             },
             .RPL_TOPIC => return Message{
                 .RPL_TOPIC = .{
                     .prefix = self.prefix,
                     .channel = self.params.next() orelse "",
-                    .text = self.params.next(),
+                    .text = self.params.next() orelse "",
                 },
             },
             else => return null,
