@@ -69,6 +69,12 @@ pub const Message = union(enum) {
         channel: []const u8,
         text: []const u8,
     },
+    ERR_NOSUCHNICK: struct {
+        prefix: ?Prefix = null,
+        nick: []const u8,
+        supplied_nick: []const u8,
+        text: []const u8,
+    },
     NOMSG: void,
 };
 
@@ -104,6 +110,7 @@ pub const ProtoMessage = struct {
         ERR_CHANOPRIVSNEEDED,
         ERR_ERRONEUSNICKNAME,
         ERR_NOSUCHCHANNEL,
+        ERR_NOSUCHNICK,
 
         AWAY,
         INVITE,
@@ -139,6 +146,7 @@ pub const ProtoMessage = struct {
             .{ "354", .RPL_WHOSPCRPL },
             .{ "366", .RPL_ENDOFNAMES },
 
+            .{ "401", .ERR_NOSUCHNICK },
             .{ "403", .ERR_NOSUCHCHANNEL },
             .{ "432", .ERR_ERRONEUSNICKNAME },
             .{ "482", .ERR_CHANOPRIVSNEEDED },
@@ -330,6 +338,14 @@ pub const ProtoMessage = struct {
                     .prefix = self.prefix,
                     .nick = self.params.next() orelse "",
                     .channel = self.params.next() orelse "",
+                    .text = self.params.next() orelse "",
+                },
+            },
+            .ERR_NOSUCHNICK => return Message{
+                .ERR_NOSUCHNICK = .{
+                    .prefix = self.prefix,
+                    .nick = self.params.next() orelse "",
+                    .supplied_nick = self.params.next() orelse "",
                     .text = self.params.next() orelse "",
                 },
             },
