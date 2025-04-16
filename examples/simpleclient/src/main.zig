@@ -1,14 +1,14 @@
 const std = @import("std");
 const zircon = @import("zircon");
 
-/// Constants used to configure the bot.
+/// Constants used to configure the client.
 const user = "zirconclient";
 const nick = "zirconclient";
 const real_name = "zirconclient";
 const server = "irc.quakenet.org";
 const port = 6667;
 const tls = false;
-var join_channels = [_][]const u8{"#aviation"};
+var join_channels = [_][]const u8{"#geeks"};
 
 /// Global Debug Allocator singleton.
 var debug_allocator = std.heap.DebugAllocator(.{}).init;
