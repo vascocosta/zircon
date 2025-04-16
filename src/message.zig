@@ -961,3 +961,259 @@ test "parse quit message with nick!user@host prefix" {
     try expect(std.mem.eql(u8, params.next().?, "goodbye!"));
     try expect(params.next() == null);
 }
+
+test "parse topic message without prefix" {
+    const msg = try ProtoMessage.parse("TOPIC #channel :new topic");
+
+    try expect(msg.prefix == null);
+    try expect(msg.command == .TOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "new topic"));
+    try expect(params.next() == null);
+}
+
+test "parse topic message with nick prefix" {
+    const msg = try ProtoMessage.parse(":nick TOPIC #channel :new topic");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "nick", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .TOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "new topic"));
+    try expect(params.next() == null);
+}
+
+test "parse topic message with nick!user prefix" {
+    const msg = try ProtoMessage.parse(":nick!user TOPIC #channel :new topic");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "nick", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "user", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .TOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "new topic"));
+    try expect(params.next() == null);
+}
+
+test "parse topic message with nick@host prefix" {
+    const msg = try ProtoMessage.parse(":nick@host TOPIC #channel :new topic");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "nick", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "host", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .TOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "new topic"));
+    try expect(params.next() == null);
+}
+
+test "parse topic message with nick!user@host prefix" {
+    const msg = try ProtoMessage.parse(":nick!user@host TOPIC #channel :new topic");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "nick", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "user", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "host", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .TOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "new topic"));
+    try expect(params.next() == null);
+}
+
+test "parse rpl topic message without prefix" {
+    const msg = try ProtoMessage.parse("332 nick #channel :Current topic");
+
+    try expect(msg.prefix == null);
+    try expect(msg.command == .RPL_TOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "Current topic"));
+    try expect(params.next() == null);
+}
+
+test "parse rpl topic message with server prefix" {
+    const msg = try ProtoMessage.parse(":irc.example.com 332 nick #channel :Current topic");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "irc.example.com", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .RPL_TOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "Current topic"));
+    try expect(params.next() == null);
+}
+
+test "parse rpl notopic message without prefix" {
+    const msg = try ProtoMessage.parse("331 nick #channel :No topic is set");
+
+    try expect(msg.prefix == null);
+    try expect(msg.command == .RPL_NOTOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "No topic is set"));
+    try expect(params.next() == null);
+}
+
+test "parse rpl notopic message with server prefix" {
+    const msg = try ProtoMessage.parse(":irc.example.com 331 nick #channel :No topic is set");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "irc.example.com", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .RPL_NOTOPIC);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "No topic is set"));
+    try expect(params.next() == null);
+}
+
+test "parse err chanoprivsneeded message without prefix" {
+    const msg = try ProtoMessage.parse("482 nick #channel :You're not channel operator");
+
+    try expect(msg.prefix == null);
+    try expect(msg.command == .ERR_CHANOPRIVSNEEDED);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "You're not channel operator"));
+    try expect(params.next() == null);
+}
+
+test "parse err chanoprivsneeded message with server prefix" {
+    const msg = try ProtoMessage.parse(":irc.example.com 482 nick #channel :You're not channel operator");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "irc.example.com", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .ERR_CHANOPRIVSNEEDED);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "#channel"));
+    try expect(std.mem.eql(u8, params.next().?, "You're not channel operator"));
+    try expect(params.next() == null);
+}
+
+test "parse err erroneousnickname message without prefix" {
+    const msg = try ProtoMessage.parse("432 nick new_nick :Erroneous nickname");
+
+    try expect(msg.prefix == null);
+    try expect(msg.command == .ERR_ERRONEUSNICKNAME);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "new_nick"));
+    try expect(std.mem.eql(u8, params.next().?, "Erroneous nickname"));
+    try expect(params.next() == null);
+}
+
+test "parse err erroneousnickname message with server prefix" {
+    const msg = try ProtoMessage.parse(":irc.example.com 432 nick new_nick :Erroneous nickname");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "irc.example.com", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .ERR_ERRONEUSNICKNAME);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "new_nick"));
+    try expect(std.mem.eql(u8, params.next().?, "Erroneous nickname"));
+    try expect(params.next() == null);
+}
+
+test "parse err nosuchchannel message without prefix" {
+    const msg = try ProtoMessage.parse("403 nick #invalid :No such channel");
+
+    try expect(msg.prefix == null);
+    try expect(msg.command == .ERR_NOSUCHCHANNEL);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "#invalid"));
+    try expect(std.mem.eql(u8, params.next().?, "No such channel"));
+    try expect(params.next() == null);
+}
+
+test "parse err nosuchchannel message with server prefix" {
+    const msg = try ProtoMessage.parse(":irc.example.com 403 nick #invalid :No such channel");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "irc.example.com", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .ERR_NOSUCHCHANNEL);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "#invalid"));
+    try expect(std.mem.eql(u8, params.next().?, "No such channel"));
+    try expect(params.next() == null);
+}
+
+test "parse err nosuchnick message without prefix" {
+    const msg = try ProtoMessage.parse("401 nick someone :No such nick");
+
+    try expect(msg.prefix == null);
+    try expect(msg.command == .ERR_NOSUCHNICK);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "someone"));
+    try expect(std.mem.eql(u8, params.next().?, "No such nick"));
+    try expect(params.next() == null);
+}
+
+test "parse err nosuchnick message with server prefix" {
+    const msg = try ProtoMessage.parse(":irc.example.com 401 nick someone :No such nick");
+
+    try expect(msg.prefix != null);
+    try expect(std.mem.eql(u8, "irc.example.com", msg.prefix.?.nick orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.user orelse ""));
+    try expect(std.mem.eql(u8, "", msg.prefix.?.host orelse ""));
+
+    try expect(msg.command == .ERR_NOSUCHNICK);
+
+    var params = msg.params;
+    try expect(std.mem.eql(u8, params.next().?, "nick"));
+    try expect(std.mem.eql(u8, params.next().?, "someone"));
+    try expect(std.mem.eql(u8, params.next().?, "No such nick"));
+    try expect(params.next() == null);
+}
