@@ -323,7 +323,7 @@ pub const Client = struct {
         }
     }
 
-    /// Writes messages from the server and processes them.
+    /// Writes callback reply messages to the server.
     fn writeLoop(self: *Client) ClientError!void {
         while (true) {
             self.mutex.lock();
