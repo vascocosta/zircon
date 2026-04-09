@@ -2,11 +2,11 @@
     .name = .zircon,
     .version = "0.6.0",
     .fingerprint = 0x4c91bc618536d4fc,
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.0",
     .dependencies = .{
         .tls = .{
-            .url = "https://github.com/ianic/tls.zig/archive/1b0228642771ba3efddb92279294e734776191e9.tar.gz",
-            .hash = "tls-0.1.0-ER2e0sAOBQDN5xgdTgG-pze9C6_MwSr-xxHDxQMxQFn-",
+            .url = "git+https://github.com/ianic/tls.zig.git?ref=zig-0.15.x#57039ba1c97400c786ef8bf8b7394995fd52fe15",
+            .hash = "tls-0.1.0-ER2e0kZoBQAKITpTPs0jkkeULb5FeQNnU5tGE2lN-wjI",
         },
     },
     .paths = .{
