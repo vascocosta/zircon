@@ -15,7 +15,11 @@ const max_msg_len = 512;
 pub const Client = struct {
     alloc: std.mem.Allocator,
     stream: std.net.Stream,
-    connection: tls.Connection(std.net.Stream),
+    connection: tls.Connection,
+    tls_in_buf: [tls.input_buffer_len]u8,
+    tcp_in_buf: [tls.input_buffer_len]u8,
+    tls_reader: tls.Connection.Reader,
+    tcp_reader: std.net.Stream.Reader,
     buf: std.ArrayList(u8),
     replies: std.ArrayList(Message),
     mutex: std.Thread.Mutex,
@@ -64,11 +68,15 @@ pub const Client = struct {
             .alloc = alloc,
             .stream = undefined,
             .connection = undefined,
+            .tls_in_buf = undefined,
+            .tls_reader = undefined,
+            .tcp_in_buf = undefined,
+            .tcp_reader = undefined,
             .buf = std.ArrayList(u8).initCapacity(alloc, max_msg_len) catch |err| {
                 utils.debug("Memory allocation failed: {}", .{err});
                 return ClientError.MemoryAllocationFailed;
             },
-            .replies = std.ArrayList(Message).init(alloc),
+            .replies = std.ArrayList(Message).empty,
             .mutex = std.Thread.Mutex{},
             .cond = std.Thread.Condition{},
             .cfg = cfg,
@@ -78,8 +86,8 @@ pub const Client = struct {
     /// Deinitializes the client, freeing resources.
     pub fn deinit(self: *Client) void {
         self.disconnect();
-        self.buf.deinit();
-        self.replies.deinit();
+        self.buf.deinit(self.alloc);
+        self.replies.deinit(self.alloc);
     }
 
     /// Establishes a connection to the IRC server.
@@ -94,19 +102,28 @@ pub const Client = struct {
             return ClientError.ConnectionFailed;
         };
 
+        self.tcp_reader = self.stream.reader(&self.tcp_in_buf);
+
         // TLS handshake process wrapping a TCP stream.
         if (self.cfg.tls) {
-            const root_ca = tls.config.CertBundle.fromSystem(self.alloc) catch |err| {
-                utils.debug("Could not get root CA: {}", .{err});
+            var root_ca = std.crypto.Certificate.Bundle{};
+            root_ca.rescan(self.alloc) catch |err| {
+                root_ca.deinit(self.alloc);
+                utils.debug("TLS handshake failed (couldn't scan certificate authorities): {}", .{err});
                 return ClientError.TlsHandshakeFailed;
             };
-            self.connection = tls.client(self.stream, .{
+
+            self.connection = tls.clientFromStream(self.stream, .{
                 .host = self.cfg.server,
                 .root_ca = root_ca,
             }) catch |err| {
+                root_ca.deinit(self.alloc);
                 utils.debug("TLS handshake failed: {}", .{err});
                 return ClientError.TlsHandshakeFailed;
             };
+
+            root_ca.deinit(self.alloc);
+            self.tls_reader = self.connection.reader(&self.tls_in_buf);
         }
         utils.debug("Connected\n", .{});
     }
@@ -114,16 +131,11 @@ pub const Client = struct {
     /// Disconnects from the IRC server.
     pub fn disconnect(self: *Client) void {
         var buffer: [10]u8 = undefined;
-        const n = self.stream.readAll(buffer[0..]) catch return;
+        const n = self.stream.read(buffer[0..]) catch return;
         if (n == 0) {
             return;
         }
-        if (self.cfg.tls) {
-            self.connection.close() catch |err| {
-                utils.debug("Could not close connection: {}\n", .{err});
-                return;
-            };
-        }
+        self.connection.close() catch {};
         self.stream.close();
         utils.debug("Disconnected\n", .{});
     }
@@ -215,7 +227,7 @@ pub const Client = struct {
         defer self.alloc.free(raw_msg);
 
         _ = switch (self.cfg.tls) {
-            true => self.connection.write(raw_msg) catch |err| {
+            true => self.connection.writeAll(raw_msg) catch |err| {
                 utils.debug("Network write failed: {}", .{err});
                 return ClientError.NetworkWriteFailed;
             },
@@ -229,7 +241,7 @@ pub const Client = struct {
     fn msgCallbackWorker(self: *Client, msg: Message, msg_callback: fn (Message) ?Message) ClientError!void {
         const reply = msg_callback(msg) orelse return;
         self.mutex.lock();
-        self.replies.append(reply) catch |err| {
+        self.replies.append(self.alloc, reply) catch |err| {
             utils.debug("Memory allocation failed: {}", .{err});
             return ClientError.MemoryAllocationFailed;
         };
@@ -299,12 +311,18 @@ pub const Client = struct {
         while (true) {
             switch (self.cfg.tls) {
                 true => {
-                    const reader = self.connection.reader();
-                    reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len) catch return;
+                    const line = self.tls_reader.interface.takeDelimiterExclusive('\n') catch return;
+                    self.buf.appendSlice(self.alloc, line) catch {
+                        utils.debug("Memory allocation failed\n", .{});
+                        return;
+                    };
                 },
                 false => {
-                    const reader = self.stream.reader();
-                    reader.streamUntilDelimiter(self.buf.writer(), '\n', max_msg_len) catch return;
+                    const line = self.tcp_reader.interface().takeDelimiterExclusive('\n') catch return;
+                    self.buf.appendSlice(self.alloc, line) catch {
+                        utils.debug("Memory allocation failed\n", .{});
+                        return;
+                    };
                 },
             }
 
